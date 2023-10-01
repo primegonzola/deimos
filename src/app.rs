@@ -13,8 +13,8 @@ pub struct App {
 }
 
 impl App {
-    /// Creates the app.
-    pub unsafe fn create(window: &Window) -> Result<Self> {
+    // Creates the app.
+    pub fn create(window: &Window) -> Result<Self> {
         // init data
         let data = AppData::default();
 
@@ -25,17 +25,17 @@ impl App {
         Ok(Self { graphics, data })
     }
 
-    /// update a frame for the app.
-    pub unsafe fn update(&mut self, _window: &Window) -> Result<()> {
+    // update the app
+    pub fn update(&mut self, window: &Window) -> Result<()> {
         // update the graphics device
-        self.graphics.update(_window)?;
+        self.graphics.update(window)?;
 
         // all went fine
         Ok(())
     }
 
-    /// Destroys the app.
-    pub unsafe fn destroy(&self) {
+    // Destroys the app.
+    pub fn destroy(&self) {
         // destroy graphics
         self.graphics.destroy();
     }

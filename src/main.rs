@@ -30,7 +30,7 @@ fn main() -> Result<()> {
     let mut destroying = false;
 
     // create app
-    let mut app = unsafe { app::App::create(&window)? };
+    let mut app = app::App::create(&window)?;
 
     // run event loop until destroying
     event_loop.run(move |event, _, control_flow| {
@@ -40,9 +40,7 @@ fn main() -> Result<()> {
         // check event
         match event {
             // update app if is not being destroyed.
-            Event::MainEventsCleared if !destroying && !minimized => {
-                unsafe { app.update(&window) }.unwrap()
-            }
+            Event::MainEventsCleared if !destroying && !minimized => app.update(&window).unwrap(),
 
             // mark the window as having been resized.
             Event::WindowEvent {
@@ -73,9 +71,7 @@ fn main() -> Result<()> {
                 *control_flow = ControlFlow::Exit;
 
                 // destroy the app
-                unsafe {
-                    app.destroy();
-                }
+                app.destroy();
             }
 
             // handle keyboard events.
