@@ -42,10 +42,12 @@ impl App {
 
 /// The api handles and associated properties used by the app.
 #[derive(Clone, Debug)]
-pub struct AppData {}
+pub struct AppData {
+    pub counter: u32,
+}
 
 impl Default for AppData {
     fn default() -> Self {
-        AppData {}
+        AppData { counter: 0 }
     }
 }

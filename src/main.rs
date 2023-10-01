@@ -2,10 +2,6 @@
 
 #![allow(
     dead_code,
-    unused_variables,
-    clippy::manual_slice_size_calculation,
-    clippy::too_many_arguments,
-    clippy::unnecessary_wraps
 )]
 
 use anyhow::Result;
@@ -87,11 +83,11 @@ fn main() -> Result<()> {
                 if input.state == ElementState::Pressed {
 
                     // check key code 
-                    // match input.virtual_keycode {
-                    //     Some(VirtualKeyCode::Left) if app.data.models > 1 => app.data.models -= 1,
-                    //     Some(VirtualKeyCode::Right) if app.data.models < 4 => app.data.models += 1,
-                    //     _ => { }
-                    // }
+                    match input.virtual_keycode {
+                        Some(VirtualKeyCode::Left) if app.data.counter > 0 => app.data.counter -= 1,
+                        Some(VirtualKeyCode::Right) if app.data.counter < 4 => app.data.counter += 1,
+                        _ => { }
+                    }
                 }
             }
             _ => {}
