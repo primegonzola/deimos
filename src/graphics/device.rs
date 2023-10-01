@@ -496,7 +496,7 @@ impl GraphicsDevice {
         create_command_buffers(&self.device, &mut self.data)?;
         self.data
             .textures_in_flight
-            .resize(self.data.swapchain_images.len(), vk::Fence::null());
+            .resize(self.data.swapchain_textures.len(), vk::Fence::null());
         Ok(())
     }
 
@@ -596,7 +596,7 @@ impl GraphicsDevice {
 
         // destroy swapchain views
         self.data
-            .swapchain_image_views
+            .swapchain_views
             .iter()
             .for_each(|v| v.destroy(&self.device));
 
@@ -619,8 +619,8 @@ struct GraphicsDeviceData {
     swapchain_format: vk::Format,
     swapchain_extent: vk::Extent2D,
     swapchain: vk::SwapchainKHR,
-    swapchain_images: Vec<Texture>,
-    swapchain_image_views: Vec<TextureView>,
+    swapchain_textures: Vec<Texture>,
+    swapchain_views: Vec<TextureView>,
 
     // pipeline
     render_pass: RenderPass,
@@ -989,13 +989,11 @@ unsafe fn create_swapchain(
     // create swap chain
     data.swapchain = device.create_swapchain_khr(&info, None)?;
 
-    // data.swapchain_images = device.get_swapchain_images_khr(data.swapchain)?;
-
     // get swap chain images
     let images = device.get_swapchain_images_khr(data.swapchain)?;
 
     // map into textures
-    data.swapchain_images = images
+    data.swapchain_textures = images
         .iter()
         .map(|i| Texture::create(*i, vk::DeviceMemory::null()))
         .collect::<Vec<_>>();
@@ -1043,8 +1041,8 @@ fn get_swapchain_extent(window: &Window, capabilities: vk::SurfaceCapabilitiesKH
 }
 
 unsafe fn create_swapchain_views(device: &Device, data: &mut GraphicsDeviceData) -> Result<()> {
-    data.swapchain_image_views = data
-        .swapchain_images
+    data.swapchain_views = data
+        .swapchain_textures
         .iter()
         .map(|i| {
             i.create_view(
@@ -1336,7 +1334,7 @@ unsafe fn create_pipeline(
 
 unsafe fn create_framebuffers(device: &Device, data: &mut GraphicsDeviceData) -> Result<()> {
     data.framebuffers = data
-        .swapchain_image_views
+        .swapchain_views
         .iter()
         .map(|i| {
             let attachments = &[
@@ -1374,7 +1372,7 @@ unsafe fn create_command_pools(
 
     // Per-framebuffer
 
-    let num_images = data.swapchain_images.len();
+    let num_images = data.swapchain_textures.len();
     for _ in 0..num_images {
         let command_pool = create_command_pool(instance, surface, physical, device, data)?;
         data.command_pools.push(command_pool);
@@ -1956,7 +1954,7 @@ unsafe fn create_uniform_buffers(
     data.uniform_buffers.clear();
 
     // create ne buffer for each swapchain image
-    for _ in 0..data.swapchain_images.len() {
+    for _ in 0..data.swapchain_textures.len() {
         let uniform_buffer = Buffer::create(
             instance,
             physical,
@@ -1977,16 +1975,16 @@ unsafe fn create_uniform_buffers(
 unsafe fn create_descriptor_pool(device: &Device, data: &mut GraphicsDeviceData) -> Result<()> {
     let ubo_size = vk::DescriptorPoolSize::builder()
         .type_(vk::DescriptorType::UNIFORM_BUFFER)
-        .descriptor_count(data.swapchain_images.len() as u32);
+        .descriptor_count(data.swapchain_textures.len() as u32);
 
     let sampler_size = vk::DescriptorPoolSize::builder()
         .type_(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-        .descriptor_count(data.swapchain_images.len() as u32);
+        .descriptor_count(data.swapchain_textures.len() as u32);
 
     let pool_sizes = &[ubo_size, sampler_size];
     let info = vk::DescriptorPoolCreateInfo::builder()
         .pool_sizes(pool_sizes)
-        .max_sets(data.swapchain_images.len() as u32);
+        .max_sets(data.swapchain_textures.len() as u32);
 
     data.descriptor_pool = DescriptorPool::create(device.create_descriptor_pool(&info, None)?);
 
@@ -1996,7 +1994,7 @@ unsafe fn create_descriptor_pool(device: &Device, data: &mut GraphicsDeviceData)
 unsafe fn create_descriptor_sets(device: &Device, data: &mut GraphicsDeviceData) -> Result<()> {
     // Allocate
 
-    let layouts = vec![data.descriptor_set_layout; data.swapchain_images.len()];
+    let layouts = vec![data.descriptor_set_layout; data.swapchain_textures.len()];
     let info = vk::DescriptorSetAllocateInfo::builder()
         .descriptor_pool(data.descriptor_pool.pool)
         .set_layouts(&layouts);
@@ -2012,7 +2010,7 @@ unsafe fn create_descriptor_sets(device: &Device, data: &mut GraphicsDeviceData)
 
     // Update
 
-    for i in 0..data.swapchain_images.len() {
+    for i in 0..data.swapchain_textures.len() {
         let info = vk::DescriptorBufferInfo::builder()
             .buffer(data.uniform_buffers[i].buffer)
             .offset(0)
@@ -2046,7 +2044,7 @@ unsafe fn create_descriptor_sets(device: &Device, data: &mut GraphicsDeviceData)
 }
 
 unsafe fn create_command_buffers(device: &Device, data: &mut GraphicsDeviceData) -> Result<()> {
-    let num_images = data.swapchain_images.len();
+    let num_images = data.swapchain_textures.len();
     for image_index in 0..num_images {
         let allocate_info = vk::CommandBufferAllocateInfo::builder()
             .command_pool(data.command_pools[image_index].pool)
@@ -2058,7 +2056,7 @@ unsafe fn create_command_buffers(device: &Device, data: &mut GraphicsDeviceData)
             .push(CommandBuffer::new(command_buffer));
     }
 
-    data.secondary_command_buffers = vec![vec![]; data.swapchain_images.len()];
+    data.secondary_command_buffers = vec![vec![]; data.swapchain_textures.len()];
 
     Ok(())
 }
@@ -2078,7 +2076,7 @@ unsafe fn create_sync_objects(device: &Device, data: &mut GraphicsDeviceData) ->
     }
 
     data.textures_in_flight = data
-        .swapchain_images
+        .swapchain_textures
         .iter()
         .map(|_| vk::Fence::null())
         .collect();
