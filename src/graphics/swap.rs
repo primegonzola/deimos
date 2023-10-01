@@ -15,32 +15,21 @@ use vulkanalia::vk::KhrSurfaceExtension;
 use vulkanalia::vk::KhrSwapchainExtension;
 
 use super::QueueFamilyIndices;
-use super::Texture;
-use super::TextureView;
 
 // #[repr(transparent)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct SwapChain {
     pub swapchain: vk::SwapchainKHR,
     pub format: vk::Format,
     pub extent: vk::Extent2D,
-    pub textures: Vec<Texture>,
-    pub views: Vec<TextureView>,
 }
 
 impl SwapChain {
-    pub fn new(
-        swapchain: vk::SwapchainKHR,
-        format: vk::Format,
-        extent: vk::Extent2D,
-        textures: Vec<Texture>,
-        views: Vec<TextureView>,
-    ) -> Self {
+    pub fn new(swapchain: vk::SwapchainKHR, format: vk::Format, extent: vk::Extent2D) -> Self {
         Self {
             swapchain,
             format,
             extent,
-            textures,
-            views,
         }
     }
 
@@ -95,7 +84,7 @@ impl SwapChain {
         device: &Device,
     ) -> Result<SwapChain> {
         let indices = QueueFamilyIndices::get(instance, surface, *physical)?;
-        let support = SwapchainSupport::get(instance, surface, *physical)?;
+        let support = SwapChainSupport::get(instance, surface, *physical)?;
 
         let surface_format = SwapChain::get_swapchain_surface_format(&support.formats);
         let present_mode = SwapChain::get_swapchain_present_mode(&support.present_modes);
@@ -140,23 +129,10 @@ impl SwapChain {
         // create swap chain
         let swapchain = device.create_swapchain_khr(&info, None)?;
 
-        // get swap chain images
-        let images = device.get_swapchain_images_khr(swapchain)?;
-
-        // map into textures
-        let textures = images
-            .iter()
-            .map(|i| Texture::create(*i, vk::DeviceMemory::null()))
-            .collect::<Vec<_>>();
-
-        let views = textures
-            .iter()
-            .map(|i| i.create_view(device, format, vk::ImageAspectFlags::COLOR, 1))
-            .collect::<Result<Vec<_>, _>>()?;
-
         // all went fine
-        Ok(SwapChain::new(swapchain, format, extent, textures, views))
+        Ok(SwapChain::new(swapchain, format, extent))
     }
+    
     pub unsafe fn destroy(&self, device: &Device) {}
 }
 
@@ -167,8 +143,6 @@ impl Default for SwapChain {
             vk::SwapchainKHR::null(),
             vk::Format::default(),
             vk::Extent2D::default(),
-            Vec::new(),
-            Vec::new(),
         )
     }
 }
@@ -182,13 +156,13 @@ impl fmt::Debug for SwapChain {
 }
 
 #[derive(Clone, Debug)]
-pub struct SwapchainSupport {
+pub struct SwapChainSupport {
     pub capabilities: vk::SurfaceCapabilitiesKHR,
     pub formats: Vec<vk::SurfaceFormatKHR>,
     pub present_modes: Vec<vk::PresentModeKHR>,
 }
 
-impl SwapchainSupport {
+impl SwapChainSupport {
     pub unsafe fn get(
         instance: &Instance,
         surface: &vk::SurfaceKHR,

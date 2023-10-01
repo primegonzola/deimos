@@ -42,7 +42,8 @@ use super::RenderPass;
 use super::Sampler;
 use super::Shader;
 use super::SuitabilityError;
-use super::SwapchainSupport;
+use super::SwapChain;
+use super::SwapChainSupport;
 use super::Texture;
 use super::TextureView;
 use super::UniformBufferObject;
@@ -93,7 +94,9 @@ impl GraphicsDevice {
         let samples = get_max_msaa_samples(&instance, &physical);
         let device = create_logical_device(&entry, &instance, &surface, &physical, &mut data)?;
 
-        create_swapchain(window, &instance, &surface, &physical, &device, &mut data)?;
+        // create the swapchain
+        data.swapchain = SwapChain::create(window, &instance, &surface, &physical, &device)?;
+
         create_swapchain_textures(&device, &mut data)?;
         create_swapchain_views(&device, &mut data)?;
 
@@ -141,7 +144,7 @@ impl GraphicsDevice {
 
         // get next image
         let result = self.device.acquire_next_image_khr(
-            self.data.swapchain,
+            self.data.swapchain.swapchain,
             u64::max_value(),
             self.data.textures_available_semaphores[self.frame],
             vk::Fence::null(),
@@ -194,7 +197,7 @@ impl GraphicsDevice {
         )?;
 
         // get the swapchain
-        let swapchains = &[self.data.swapchain];
+        let swapchains = &[self.data.swapchain.swapchain];
 
         // image index to present
         let image_indices = &[image_index as u32];
@@ -256,7 +259,7 @@ impl GraphicsDevice {
         // define render area
         let render_area = vk::Rect2D::builder()
             .offset(vk::Offset2D::default())
-            .extent(self.data.swapchain_extent);
+            .extent(self.data.swapchain.extent);
 
         // define clear value used for color
         let color_clear_value = vk::ClearValue {
@@ -434,7 +437,7 @@ impl GraphicsDevice {
         let proj = correction
             * cgmath::perspective(
                 Deg(45.0),
-                self.data.swapchain_extent.width as f32 / self.data.swapchain_extent.height as f32,
+                self.data.swapchain.extent.width as f32 / self.data.swapchain.extent.height as f32,
                 0.1,
                 10.0,
             );
@@ -459,13 +462,12 @@ impl GraphicsDevice {
     unsafe fn recreate_swapchain(&mut self, window: &Window) -> Result<()> {
         self.device.device_wait_idle()?;
         self.destroy_swapchain();
-        create_swapchain(
+        self.data.swapchain = SwapChain::create(
             window,
             &self.instance,
             &self.surface,
             &self.physical,
             &self.device,
-            &mut self.data,
         )?;
         create_swapchain_textures(&self.device, &mut self.data)?;
         create_swapchain_views(&self.device, &mut self.data)?;
@@ -603,7 +605,8 @@ impl GraphicsDevice {
             .for_each(|v| v.destroy(&self.device));
 
         // destroy swapchain
-        self.device.destroy_swapchain_khr(self.data.swapchain, None);
+        self.device
+            .destroy_swapchain_khr(self.data.swapchain.swapchain, None);
     }
 }
 
@@ -618,9 +621,7 @@ struct GraphicsDeviceData {
     present_queue: Queue,
 
     // swapchain
-    swapchain_format: vk::Format,
-    swapchain_extent: vk::Extent2D,
-    swapchain: vk::SwapchainKHR,
+    swapchain: SwapChain,
     swapchain_textures: Vec<Texture>,
     swapchain_views: Vec<TextureView>,
 
@@ -813,7 +814,7 @@ unsafe fn check_physical_device(
     QueueFamilyIndices::get(instance, surface, physical_device)?;
     check_physical_device_extensions(instance, physical_device)?;
 
-    let support = SwapchainSupport::get(instance, surface, physical_device)?;
+    let support = SwapChainSupport::get(instance, surface, physical_device)?;
     if support.formats.is_empty() || support.present_modes.is_empty() {
         return Err(anyhow!(SuitabilityError("Insufficient swapchain support.")));
     }
@@ -934,109 +935,9 @@ unsafe fn create_logical_device(
     Ok(device)
 }
 
-unsafe fn create_swapchain(
-    window: &Window,
-    instance: &Instance,
-    surface: &vk::SurfaceKHR,
-    physical: &vk::PhysicalDevice,
-    device: &Device,
-    data: &mut GraphicsDeviceData,
-) -> Result<()> {
-    // Image
-
-    let indices = QueueFamilyIndices::get(instance, surface, *physical)?;
-    let support = SwapchainSupport::get(instance, surface, *physical)?;
-
-    let surface_format = get_swapchain_surface_format(&support.formats);
-    let present_mode = get_swapchain_present_mode(&support.present_modes);
-    let extent = get_swapchain_extent(window, support.capabilities);
-
-    data.swapchain_format = surface_format.format;
-    data.swapchain_extent = extent;
-
-    let mut image_count = support.capabilities.min_image_count + 1;
-    if support.capabilities.max_image_count != 0
-        && image_count > support.capabilities.max_image_count
-    {
-        image_count = support.capabilities.max_image_count;
-    }
-
-    let mut queue_family_indices = vec![];
-    let image_sharing_mode = if indices.graphics != indices.present {
-        queue_family_indices.push(indices.graphics);
-        queue_family_indices.push(indices.present);
-        vk::SharingMode::CONCURRENT
-    } else {
-        vk::SharingMode::EXCLUSIVE
-    };
-
-    // Create
-
-    let info = vk::SwapchainCreateInfoKHR::builder()
-        .surface(*surface)
-        .min_image_count(image_count)
-        .image_format(surface_format.format)
-        .image_color_space(surface_format.color_space)
-        .image_extent(extent)
-        .image_array_layers(1)
-        .image_usage(vk::ImageUsageFlags::COLOR_ATTACHMENT)
-        .image_sharing_mode(image_sharing_mode)
-        .queue_family_indices(&queue_family_indices)
-        .pre_transform(support.capabilities.current_transform)
-        .composite_alpha(vk::CompositeAlphaFlagsKHR::OPAQUE)
-        .present_mode(present_mode)
-        .clipped(true)
-        .old_swapchain(vk::SwapchainKHR::null());
-
-    // create swap chain
-    data.swapchain = device.create_swapchain_khr(&info, None)?;
-
-    Ok(())
-}
-
-fn get_swapchain_surface_format(formats: &[vk::SurfaceFormatKHR]) -> vk::SurfaceFormatKHR {
-    formats
-        .iter()
-        .cloned()
-        .find(|f| {
-            f.format == vk::Format::B8G8R8A8_SRGB
-                && f.color_space == vk::ColorSpaceKHR::SRGB_NONLINEAR
-        })
-        .unwrap_or_else(|| formats[0])
-}
-
-fn get_swapchain_present_mode(present_modes: &[vk::PresentModeKHR]) -> vk::PresentModeKHR {
-    present_modes
-        .iter()
-        .cloned()
-        .find(|m| *m == vk::PresentModeKHR::MAILBOX)
-        .unwrap_or(vk::PresentModeKHR::FIFO)
-}
-
-fn get_swapchain_extent(window: &Window, capabilities: vk::SurfaceCapabilitiesKHR) -> vk::Extent2D {
-    if capabilities.current_extent.width != u32::max_value() {
-        capabilities.current_extent
-    } else {
-        let size = window.inner_size();
-        let clamp = |min: u32, max: u32, v: u32| min.max(max.min(v));
-        vk::Extent2D::builder()
-            .width(clamp(
-                capabilities.min_image_extent.width,
-                capabilities.max_image_extent.width,
-                size.width,
-            ))
-            .height(clamp(
-                capabilities.min_image_extent.height,
-                capabilities.max_image_extent.height,
-                size.height,
-            ))
-            .build()
-    }
-}
-
 unsafe fn create_swapchain_textures(device: &Device, data: &mut GraphicsDeviceData) -> Result<()> {
     // get swap chain images
-    let images = device.get_swapchain_images_khr(data.swapchain)?;
+    let images = device.get_swapchain_images_khr(data.swapchain.swapchain)?;
 
     // map into textures
     data.swapchain_textures = images
@@ -1054,7 +955,7 @@ unsafe fn create_swapchain_views(device: &Device, data: &mut GraphicsDeviceData)
         .map(|i| {
             i.create_view(
                 device,
-                data.swapchain_format,
+                data.swapchain.format,
                 vk::ImageAspectFlags::COLOR,
                 1,
             )
@@ -1074,7 +975,7 @@ unsafe fn create_render_pass(
     // Attachments
 
     let color_attachment = vk::AttachmentDescription::builder()
-        .format(data.swapchain_format)
+        .format(data.swapchain.format)
         .samples(*samples)
         .load_op(vk::AttachmentLoadOp::CLEAR)
         .store_op(vk::AttachmentStoreOp::STORE)
@@ -1094,7 +995,7 @@ unsafe fn create_render_pass(
         .final_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
     let color_resolve_attachment = vk::AttachmentDescription::builder()
-        .format(data.swapchain_format)
+        .format(data.swapchain.format)
         .samples(vk::SampleCountFlags::_1)
         .load_op(vk::AttachmentLoadOp::DONT_CARE)
         .store_op(vk::AttachmentStoreOp::STORE)
@@ -1229,14 +1130,14 @@ unsafe fn create_pipeline(
     let viewport = vk::Viewport::builder()
         .x(0.0)
         .y(0.0)
-        .width(data.swapchain_extent.width as f32)
-        .height(data.swapchain_extent.height as f32)
+        .width(data.swapchain.extent.width as f32)
+        .height(data.swapchain.extent.height as f32)
         .min_depth(0.0)
         .max_depth(1.0);
 
     let scissor = vk::Rect2D::builder()
         .offset(vk::Offset2D { x: 0, y: 0 })
-        .extent(data.swapchain_extent);
+        .extent(data.swapchain.extent);
 
     let viewports = &[viewport];
     let scissors = &[scissor];
@@ -1352,8 +1253,8 @@ unsafe fn create_framebuffers(device: &Device, data: &mut GraphicsDeviceData) ->
             let create_info = vk::FramebufferCreateInfo::builder()
                 .render_pass(data.render_pass.pass)
                 .attachments(attachments)
-                .width(data.swapchain_extent.width)
-                .height(data.swapchain_extent.height)
+                .width(data.swapchain.extent.width)
+                .height(data.swapchain.extent.height)
                 .layers(1);
             FrameBuffer::create(
                 device
@@ -1417,11 +1318,11 @@ unsafe fn create_color_objects(
         physical,
         device,
         data,
-        data.swapchain_extent.width,
-        data.swapchain_extent.height,
+        data.swapchain.extent.width,
+        data.swapchain.extent.height,
         1,
         *samples,
-        data.swapchain_format,
+        data.swapchain.format,
         vk::ImageTiling::OPTIMAL,
         vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSIENT_ATTACHMENT,
         vk::MemoryPropertyFlags::DEVICE_LOCAL,
@@ -1430,7 +1331,7 @@ unsafe fn create_color_objects(
     // texture view
     data.color_texture_view = data.color_texture.create_view(
         device,
-        data.swapchain_format,
+        data.swapchain.format,
         vk::ImageAspectFlags::COLOR,
         1,
     )?;
@@ -1455,8 +1356,8 @@ unsafe fn create_depth_objects(
         physical,
         device,
         data,
-        data.swapchain_extent.width,
-        data.swapchain_extent.height,
+        data.swapchain.extent.width,
+        data.swapchain.extent.height,
         1,
         *samples,
         format,
