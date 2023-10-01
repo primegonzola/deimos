@@ -67,7 +67,6 @@ type Vec2 = cgmath::Vector2<f32>;
 type Vec3 = cgmath::Vector3<f32>;
 type Mat4 = cgmath::Matrix4<f32>;
 
-/// Our the app.
 #[derive(Clone, Debug)]
 pub struct GraphicsDevice {
     entry: Entry,
@@ -610,7 +609,6 @@ impl GraphicsDevice {
     }
 }
 
-/// The Vulkan handles and associated properties used by the app.
 #[derive(Clone, Debug, Default)]
 struct GraphicsDeviceData {
     // debug
