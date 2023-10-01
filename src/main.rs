@@ -15,8 +15,6 @@ use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::WindowBuilder;
 
 mod app;
-mod graphics;
-mod rendering;
 
 #[rustfmt::skip]
 fn main() -> Result<()> {
@@ -65,7 +63,7 @@ fn main() -> Result<()> {
                     minimized = false;
 
                     // mark window as being resized
-                    app.graphics.resized = true;
+                    // app.graphics.resized = true;
                 }
             }
             
@@ -89,11 +87,11 @@ fn main() -> Result<()> {
                 if input.state == ElementState::Pressed {
 
                     // check key code 
-                    match input.virtual_keycode {
-                        Some(VirtualKeyCode::Left) if app.data.models > 1 => app.data.models -= 1,
-                        Some(VirtualKeyCode::Right) if app.data.models < 4 => app.data.models += 1,
-                        _ => { }
-                    }
+                    // match input.virtual_keycode {
+                    //     Some(VirtualKeyCode::Left) if app.data.models > 1 => app.data.models -= 1,
+                    //     Some(VirtualKeyCode::Right) if app.data.models < 4 => app.data.models += 1,
+                    //     _ => { }
+                    // }
                 }
             }
             _ => {}
