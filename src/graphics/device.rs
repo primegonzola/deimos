@@ -1403,9 +1403,7 @@ unsafe fn create_command_pool(
         .flags(vk::CommandPoolCreateFlags::TRANSIENT)
         .queue_family_index(indices.graphics);
 
-    Ok(CommandPool::new(
-        device.create_command_pool(&info, None)?,
-    ))
+    Ok(CommandPool::new(device.create_command_pool(&info, None)?))
 }
 
 unsafe fn create_color_objects(
@@ -2342,23 +2340,7 @@ unsafe fn begin_single_time_commands(
     device: &Device,
     data: &GraphicsDeviceData,
 ) -> Result<CommandBuffer> {
-    // Allocate
-
-    let info = vk::CommandBufferAllocateInfo::builder()
-        .level(vk::CommandBufferLevel::PRIMARY)
-        .command_pool(data.command_pool.pool)
-        .command_buffer_count(1);
-
-    let command_buffer = device.allocate_command_buffers(&info)?[0];
-
-    // Begin
-
-    let info =
-        vk::CommandBufferBeginInfo::builder().flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
-
-    device.begin_command_buffer(command_buffer, &info)?;
-
-    Ok(CommandBuffer::new(command_buffer))
+    Ok(CommandPool::begin_single(device, &data.command_pool)?)
 }
 
 unsafe fn end_single_time_commands(
@@ -2366,21 +2348,12 @@ unsafe fn end_single_time_commands(
     data: &GraphicsDeviceData,
     command_buffer: CommandBuffer,
 ) -> Result<()> {
-    // End
-
-    device.end_command_buffer(command_buffer.buffer)?;
-
-    // Submit
-
-    let command_buffers = &[command_buffer.buffer];
-    let info = vk::SubmitInfo::builder().command_buffers(command_buffers);
-
-    device.queue_submit(data.graphics_queue.queue, &[info], vk::Fence::null())?;
-    device.queue_wait_idle(data.graphics_queue.queue)?;
-
-    // Cleanup
-
-    device.free_command_buffers(data.command_pool.pool, &[command_buffer.buffer]);
+    CommandPool::end_single(
+        device,
+        &data.command_pool,
+        &data.graphics_queue,
+        command_buffer,
+    )?;
 
     Ok(())
 }
