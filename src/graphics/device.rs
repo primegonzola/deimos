@@ -151,14 +151,14 @@ impl GraphicsDevice {
         );
 
         // get the image or rebuild if not found
-        let image_index = match result {
-            Ok((image_index, _)) => image_index as usize,
+        let index = match result {
+            Ok((index, _)) => index as usize,
             Err(vk::ErrorCode::OUT_OF_DATE_KHR) => return self.recreate_swapchain(window),
             Err(e) => return Err(anyhow!(e)),
         };
 
         // get the current image to use
-        let texture_in_flight = self.data.textures_in_flight[image_index];
+        let texture_in_flight = self.data.textures_in_flight[index];
 
         // check if valid
         if !texture_in_flight.is_null() {
@@ -168,17 +168,17 @@ impl GraphicsDevice {
         }
 
         // set next image to use
-        self.data.textures_in_flight[image_index] = in_flight_fence;
+        self.data.textures_in_flight[index] = in_flight_fence;
 
         // update command buffer
-        self.update_command_buffer(image_index, count)?;
+        self.update_command_buffer(index, count)?;
 
         // update uniform buffer
-        self.update_uniform_buffer(image_index)?;
+        self.update_uniform_buffer(index)?;
 
         let wait_semaphores = &[self.data.textures_available_semaphores[self.frame]];
         let wait_stages = &[vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
-        let command_buffers = &[self.data.primary_command_buffers[image_index].buffer];
+        let command_buffers = &[self.data.primary_command_buffers[index].buffer];
         let signal_semaphores = &[self.data.render_finished_semaphores[self.frame]];
         let submit_info = vk::SubmitInfo::builder()
             .wait_semaphores(wait_semaphores)
@@ -200,13 +200,13 @@ impl GraphicsDevice {
         let swapchains = &[self.data.swapchain.swapchain];
 
         // image index to present
-        let image_indices = &[image_index as u32];
+        let indices = &[index as u32];
 
         // get the present infoe
         let present_info = vk::PresentInfoKHR::builder()
             .wait_semaphores(signal_semaphores)
             .swapchains(swapchains)
-            .image_indices(image_indices);
+            .image_indices(indices);
 
         // get the current presentation info
         let result = self
@@ -1245,22 +1245,13 @@ unsafe fn create_framebuffers(device: &Device, data: &mut GraphicsDeviceData) ->
         .swapchain_views
         .iter()
         .map(|i| {
-            let attachments = &[
-                data.color_texture_view.view,
-                data.depth_texture_view.view,
-                i.view,
-            ];
-            let create_info = vk::FramebufferCreateInfo::builder()
-                .render_pass(data.render_pass.pass)
-                .attachments(attachments)
-                .width(data.swapchain.extent.width)
-                .height(data.swapchain.extent.height)
-                .layers(1);
             FrameBuffer::create(
-                device
-                    .create_framebuffer(&create_info, None)
-                    .expect("Failed to create framebuffer."),
-            )
+                device,
+                &data.render_pass,
+                &[data.color_texture_view, data.depth_texture_view, *i],
+                data.swapchain.extent.width,
+                data.swapchain.extent.height,
+            ).expect("Failed to create framebuffer.")
         })
         .collect();
 
