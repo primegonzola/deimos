@@ -233,7 +233,7 @@ fn main() {
     // To continue rendering, we need to recreate the swapchain by creating a new swapchain. Here,
     // we remember that we need to do this for the next loop iteration.
     //
-    let mut recreate_swapchain = false;
+    // let mut recreate_swapchain = false;
 
 
     //
@@ -244,7 +244,7 @@ fn main() {
     // Destroying the `GpuFuture` blocks until the GPU is finished executing it. In order to avoid
     // that, we store the submission of the previous frame here.
     //
-    let mut previous_frame_end = Some(sync::now(graphics.device.clone()).boxed());
+    // let mut previous_frame_end = Some(sync::now(graphics.device.clone()).boxed());
 
     //
     // process the event loop
@@ -261,7 +261,7 @@ fn main() {
                 event: WindowEvent::Resized(_),
                 ..
             } => {
-                recreate_swapchain = true;
+                graphics.recreate_swapchain = true;
             }
             Event::RedrawEventsCleared => {
                 //
@@ -285,14 +285,14 @@ fn main() {
                 // Calling this function polls various fences in order to determine what the GPU
                 // has already processed, and frees the resources that are no longer needed.
                 //
-                previous_frame_end.as_mut().unwrap().cleanup_finished();
+                graphics.previous_frame_end.as_mut().unwrap().cleanup_finished();
 
                 //
                 // Whenever the window resizes we need to recreate everything dependent on the
                 // window size. In this example that includes the swapchain, the framebuffers and
                 // the dynamic state viewport.
                 //
-                if recreate_swapchain {
+                if graphics.recreate_swapchain {
                     // Use the new dimensions of the window.
 
                     let (new_swapchain, new_images) =
@@ -328,7 +328,7 @@ fn main() {
                     //
                     // swapchain has been recreated.
                     //
-                    recreate_swapchain = false;
+                    graphics.recreate_swapchain = false;
                 }
 
                 //
@@ -344,7 +344,7 @@ fn main() {
                     match acquire_next_image(graphics.swapchain.clone(), None) {
                         Ok(r) => r,
                         Err(AcquireError::OutOfDate) => {
-                            recreate_swapchain = true;
+                            graphics.recreate_swapchain = true;
                             return;
                         }
                         Err(e) => panic!("failed to acquire next image: {e}"),
@@ -360,7 +360,7 @@ fn main() {
                     //
                     // force recreation of swapchain
                     //
-                    recreate_swapchain = true;
+                    graphics.recreate_swapchain = true;
                 }
 
                 //
@@ -422,7 +422,7 @@ fn main() {
                 // Finish building the command buffer by calling `build`.
                 let command_buffer = builder.build().unwrap();
 
-                let future = previous_frame_end
+                let future = graphics.previous_frame_end
                     .take()
                     .unwrap()
                     .join(acquire_future)
@@ -447,11 +447,11 @@ fn main() {
 
                 match future {
                     Ok(future) => {
-                        previous_frame_end = Some(future.boxed());
+                        graphics.previous_frame_end = Some(future.boxed());
                     }
                     Err(FlushError::OutOfDate) => {
-                        recreate_swapchain = true;
-                        previous_frame_end = Some(sync::now(graphics.device.clone()).boxed());
+                        graphics.recreate_swapchain = true;
+                        graphics.previous_frame_end = Some(sync::now(graphics.device.clone()).boxed());
                     }
                     Err(e) => {
                         panic!("failed to flush future: {e}");

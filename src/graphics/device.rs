@@ -3,8 +3,8 @@
 // #![allow(dead_code)]
 use anyhow::Result;
 use std::sync::Arc;
+use vulkano::image::ImageAccess;
 use vulkano::sync::GpuFuture;
-use vulkano::{command_buffer, image::ImageAccess};
 use vulkano_win::VkSurfaceBuild;
 use winit::{
     event_loop::EventLoop,
