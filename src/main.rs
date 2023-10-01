@@ -208,11 +208,13 @@ fn main() {
     //
     // Since we need to draw to multiple images, we are going to create a different framebuffer for
     // each image.
-    let (mut viewport, mut framebuffers) = window_size_dependent_setup(
+    let (viewport, mut framebuffers) = window_size_dependent_setup(
         &graphics.swapchain_images,
         render_pass.clone(),
         &viewport,
     );
+
+    graphics.viewport = viewport;
 
     // Initialization is finally finished!
 
@@ -313,10 +315,10 @@ fn main() {
                     let(vp, fbs) = window_size_dependent_setup(
                         &new_images,
                         render_pass.clone(),
-                        &viewport,
+                        &graphics.viewport,
                     );
 
-                    viewport = vp;
+                    graphics.viewport = vp;
                     framebuffers = fbs;
 
                     //
@@ -417,7 +419,7 @@ fn main() {
                     // We are now inside the first subpass of the render pass.
                     //
                     // TODO: Document state setting and how it affects subsequent draw commands.
-                    .set_viewport(0, [viewport.clone()])
+                    .set_viewport(0, [graphics.viewport.clone()])
                     .bind_pipeline_graphics(pipeline.clone())
                     .bind_vertex_buffers(0, vertex_buffer.clone())
                     // We add a draw command.
