@@ -1,0 +1,27 @@
+[package]
+name = "deimos"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1"
+log = "0.4"
+cgmath = "0.18"
+png = "0.17"
+pretty_env_logger = "0.4"
+thiserror = "1"
+tobj = { version = "3", features = ["log"] }
+vulkanalia = { version = "=0.22.0", features = ["libloading", "provisional", "window"] }
+winit = "0.28"
+
+# anyhow – used for simple error handling
+# log – used for logging statements
+# cgmath – used as a Rust replacement for GLM (graphics math library)
+# png – used to load PNGs to use as textures
+# pretty_env_logger – used to print our logs to the console
+# thiserror – used to define custom errors types without boilerplate
+# tobj – used to load 3D models in the Wavefront .obj format
+# vulkanalia – used to call the Vulkan API
+# winit – used to create a window to render to
