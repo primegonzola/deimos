@@ -9,6 +9,7 @@ mod pass;
 mod pipeline;
 mod queue;
 mod sampler;
+mod swap;
 mod shader;
 mod texture;
 
@@ -24,4 +25,5 @@ pub use self::pipeline::*;
 pub use self::queue::*;
 pub use self::sampler::*;
 pub use self::shader::*;
+pub use self::swap::*;
 pub use self::texture::*;
