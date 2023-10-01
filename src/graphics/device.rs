@@ -185,7 +185,7 @@ impl GraphicsDevice {
         // reset all fences
         self.device.reset_fences(&[in_flight_fence])?;
 
-        // submit buffers to que
+        // submit buffers to queue
         self.device.queue_submit(
             self.data.graphics_queue.queue,
             &[submit_info],
