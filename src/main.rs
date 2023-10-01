@@ -257,18 +257,23 @@ fn main() {
                 graphics.recreate_swapchain = true;
             }
             Event::RedrawEventsCleared => {
-                //
-                // Do not draw the frame when the screen dimensions are zero. On Windows, this can
-                // occur when minimizing the application.
-                //
-                let window = graphics
-                    .surface
-                    .object()
-                    .unwrap()
-                    .downcast_ref::<Window>()
-                    .unwrap();
-                let dimensions = window.inner_size();
-                if dimensions.width == 0 || dimensions.height == 0 {
+                // //
+                // // Do not draw the frame when the screen dimensions are zero. On Windows, this can
+                // // occur when minimizing the application.
+                // //
+                // let window = graphics
+                //     .surface
+                //     .object()
+                //     .unwrap()
+                //     .downcast_ref::<Window>()
+                //     .unwrap();
+                // let dimensions = window.inner_size();
+                // if dimensions.width == 0 || dimensions.height == 0 {
+                //     return;
+                // }
+
+                // check if minized
+                if graphics.minimized() {
                     return;
                 }
 
@@ -293,10 +298,12 @@ fn main() {
                     // Use the new dimensions of the window.
 
                     let (new_swapchain, new_images) =
-                        match graphics.swapchain.recreate(SwapchainCreateInfo {
-                            image_extent: dimensions.into(),
-                            ..graphics.swapchain.create_info()
-                        }) {
+                        match graphics
+                            .swapchain
+                            .recreate(vulkano::swapchain::SwapchainCreateInfo {
+                                image_extent: graphics.dimensions().into(),
+                                ..graphics.swapchain.create_info()
+                            }) {
                             Ok(r) => r,
                             //
                             // This error tends to happen when the user is manually resizing the
@@ -364,6 +371,8 @@ fn main() {
                     //
                     graphics.recreate_swapchain = true;
                 }
+
+                // graphics.begin().expect("failed to begin graphics");
 
                 // Before we can start creating and recording command buffers, we need a way of allocating
                 // them. Vulkano provides a command buffer allocator, which manages raw Vulkan command pools

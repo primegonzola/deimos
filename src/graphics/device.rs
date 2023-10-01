@@ -3,9 +3,10 @@
 // #![allow(dead_code)]
 use anyhow::Result;
 use std::sync::Arc;
-use vulkano::image::ImageAccess;
 use vulkano::sync::GpuFuture;
+use vulkano::{device::physical::PhysicalDevice, image::ImageAccess};
 use vulkano_win::VkSurfaceBuild;
+use winit::dpi::PhysicalSize;
 use winit::{
     event_loop::EventLoop,
     window::{Window, WindowBuilder},
@@ -339,115 +340,125 @@ impl Device {
         })
     }
 
-    pub fn begin(&mut self) -> Result<()> {
-        // get window dimensions
+    pub fn dimensions(&self) -> PhysicalSize<u32> {
         let window = self
             .surface
             .object()
             .unwrap()
             .downcast_ref::<Window>()
             .unwrap();
-        // get the dimensions of the window
-        let dimensions = window.inner_size();
+        window.inner_size()
+    }
 
-        // check if minimuzed or not
-        if dimensions.width != 0 && dimensions.height != 0 {
-            //
-            // It is important to call this function from time to time, otherwise resources
-            // will keep accumulating and you will eventually reach an out of memory error.
-            // Calling this function polls various fences in order to determine what the GPU
-            // has already processed, and frees the resources that are no longer needed.
-            //
-            self.previous_frame_end.as_mut().unwrap().cleanup_finished();
+    pub fn minimized(&self) -> bool {
+        let window = self
+            .surface
+            .object()
+            .unwrap()
+            .downcast_ref::<Window>()
+            .unwrap();
+        let dimensions = self.dimensions();
+        dimensions.width == 0 || dimensions.height == 0
+    }
 
-            //
-            // Whenever the window resizes we need to recreate everything dependent on the
-            // window size. In this example that includes the swapchain, the framebuffers and
-            // the dynamic state viewport.
-            //
-            if self.recreate_swapchain {
-                // Use the new dimensions of the window.
+    pub fn begin(&mut self) -> Result<()> {
+        //
+        // Do not draw the frame when the screen dimensions are zero. On Windows, this can
+        // occur when minimizing the application.
+        //
+        if self.minimized() {
+            return Ok(());
+        }
+        //
+        // It is important to call this function from time to time, otherwise resources
+        // will keep accumulating and you will eventually reach an out of memory error.
+        // Calling this function polls various fences in order to determine what the GPU
+        // has already processed, and frees the resources that are no longer needed.
+        //
+        self.previous_frame_end.as_mut().unwrap().cleanup_finished();
 
-                let (new_swapchain, new_images) =
-                    match self
-                        .swapchain
-                        .recreate(vulkano::swapchain::SwapchainCreateInfo {
-                            image_extent: dimensions.into(),
-                            ..self.swapchain.create_info()
-                        }) {
-                        Ok(r) => r,
-                        //
-                        // This error tends to happen when the user is manually resizing the
-                        // window. Simply restarting the loop is the easiest way to fix this
-                        // issue.
-                        //
-                        Err(
-                            vulkano::swapchain::SwapchainCreationError::ImageExtentNotSupported {
-                                ..
-                            },
-                        ) => return Ok(()),
-                        Err(e) => panic!("failed to recreate swapchain: {e}"),
-                    };
+        //
+        // Whenever the window resizes we need to recreate everything dependent on the
+        // window size. In this example that includes the swapchain, the framebuffers and
+        // the dynamic state viewport.
+        //
+        if self.recreate_swapchain {
+            // Use the new dimensions of the window.
 
-                // save new swapchain
-                self.swapchain = new_swapchain;
-
-                //
-                // Because framebuffers contains a reference to the old swapchain, we need to
-                // recreate framebuffers as well.
-                //
-                let (viewport, fbs) = window_size_dependent_setup(
-                    &new_images,
-                    self.render_pass.clone(),
-                    &self.viewport,
-                );
-
-                // override viewport
-                self.viewport = viewport;
-
-                // save new buffers
-                self.framebuffers = fbs;
-
-                // swapchain has been recreated.
-                self.recreate_swapchain = false;
-
-                //
-                // Before we can draw on the output, we have to *acquire* an image from the
-                // swapchain. If no image is available (which happens if you submit draw commands
-                // too quickly), then the function will block. This operation returns the index of
-                // the image that we are allowed to draw upon.
-                //
-                // This function can block if no image is available. The parameter is an optional
-                // timeout after which the function call will return an error.
-                //
-                let (image_index, suboptimal, acquire_future) =
-                    match vulkano::swapchain::acquire_next_image(self.swapchain.clone(), None) {
-                        Ok(r) => r,
-                        Err(vulkano::swapchain::AcquireError::OutOfDate) => {
-                            self.recreate_swapchain = true;
-                            return Ok(());
-                        }
-                        Err(e) => panic!("failed to acquire next image: {e}"),
-                    };
-
-                // update local
-                self.suboptimal = suboptimal;
-                self.image_index = image_index;
-                self.acquire_future = Some(acquire_future);
-
-                //
-                // `acquire_next_image` can be successful, but suboptimal. This means that the
-                // swapchain image will still work, but it may not display correctly. With some
-                // drivers this can be when the window resizes, but it may not cause the swapchain
-                // to become out of date.
-                //
-                if self.suboptimal {
+            let (new_swapchain, new_images) =
+                match self
+                    .swapchain
+                    .recreate(vulkano::swapchain::SwapchainCreateInfo {
+                        image_extent: self.dimensions().into(),
+                        ..self.swapchain.create_info()
+                    }) {
+                    Ok(r) => r,
                     //
-                    // force recreation of swapchain
+                    // This error tends to happen when the user is manually resizing the
+                    // window. Simply restarting the loop is the easiest way to fix this
+                    // issue.
                     //
+                    Err(vulkano::swapchain::SwapchainCreationError::ImageExtentNotSupported {
+                        ..
+                    }) => return Ok(()),
+                    Err(e) => panic!("failed to recreate swapchain: {e}"),
+                };
+
+            //
+            // save new swapchain
+            //
+            self.swapchain = new_swapchain;
+
+            //
+            // Because framebuffers contains a reference to the old swapchain, we need to
+            // recreate framebuffers as well.
+            //
+            let (nvp, fbs) =
+                window_size_dependent_setup(&new_images, self.render_pass.clone(), &self.viewport);
+
+            // overwrite
+            self.viewport = nvp;
+            self.framebuffers = fbs;
+
+            // swapchain has been recreated.
+            self.recreate_swapchain = false;
+        }
+
+        //
+        // Before we can draw on the output, we have to *acquire* an image from the
+        // swapchain. If no image is available (which happens if you submit draw commands
+        // too quickly), then the function will block. This operation returns the index of
+        // the image that we are allowed to draw upon.
+        //
+        // This function can block if no image is available. The parameter is an optional
+        // timeout after which the function call will return an error.
+        //
+        let (image_index, suboptimal, acquire_future) =
+            match vulkano::swapchain::acquire_next_image(self.swapchain.clone(), None) {
+                Ok(r) => r,
+                Err(vulkano::swapchain::AcquireError::OutOfDate) => {
                     self.recreate_swapchain = true;
+                    return Ok(());
                 }
-            }
+                Err(e) => panic!("failed to acquire next image: {e}"),
+            };
+
+        // update
+        self.suboptimal = suboptimal;
+        self.acquire_future = Some(acquire_future);
+        self.image_index = image_index;
+
+        //
+        // `acquire_next_image` can be successful, but suboptimal. This means that the
+        // swapchain image will still work, but it may not display correctly. With some
+        // drivers this can be when the window resizes, but it may not cause the swapchain
+        // to become out of date.
+        //
+        if self.suboptimal {
+            //
+            // force recreation of swapchain
+            //
+            self.recreate_swapchain = true;
         }
 
         // all went fine
