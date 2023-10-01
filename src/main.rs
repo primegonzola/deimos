@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-#![allow(dead_code)]
+// #![allow(dead_code)]
 
 use anyhow::Result;
 use winit::dpi::LogicalSize;
@@ -9,6 +9,7 @@ use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::WindowBuilder;
 
 mod app;
+mod graphics;
 
 // #[rustfmt::skip]
 fn main() -> Result<()> {

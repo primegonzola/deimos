@@ -1,37 +1,43 @@
 // SPDX-License-Identifier: MIT
 
-#![allow(
-    dead_code,
-)]
+// #![allow(dead_code)]
 
 use anyhow::Result;
 use winit::window::Window;
 
-/// the app.
-#[derive(Clone, Debug)]
+use crate::graphics;
+
 pub struct App {
     pub data: AppData,
+    pub graphics: graphics::Device,
 }
 
 impl App {
     /// Creates the app.
-    pub unsafe fn create(_window: &Window) -> Result<Self> {
+    pub unsafe fn create(window: &Window) -> Result<Self> {
         // init data
         let data = AppData::default();
 
+        // create the graphics device
+        let graphics = graphics::Device::create(window)?;
+
         // init app instance
-        Ok(Self { data })
+        Ok(Self { graphics, data })
     }
 
-    /// update s a frame for the app.
+    /// update a frame for the app.
     pub unsafe fn update(&mut self, _window: &Window) -> Result<()> {
+        // update the graphics device
+        self.graphics.update(_window)?;
+
         // all went fine
         Ok(())
     }
 
     /// Destroys the app.
     pub unsafe fn destroy(&self) {
-        // destroy any app data
+        // destroy graphics
+        self.graphics.destroy();
     }
 }
 
