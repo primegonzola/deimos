@@ -130,55 +130,12 @@ fn main() {
     let vs = vs::load(graphics.device.clone()).unwrap();
     let fs = fs::load(graphics.device.clone()).unwrap();
 
-    // At this point, OpenGL initialization would be finished. However in Vulkan it is not. OpenGL
-    // implicitly does a lot of computation whenever you draw. In Vulkan, you have to do all this
-    // manually.
-
-    //
-    // The next step is to create a *render pass*, which is an object that describes where the
-    // output of the graphics pipeline will go. It describes the layout of the images where the
-    // colors, depth and/or stencil information will be written.
-    //
-    let render_pass = vulkano::single_pass_renderpass!(
-        graphics.device.clone(),
-        attachments: {
-            // `color` is a custom name we give to the first and only attachment.
-            color: {
-                // `load: Clear` means that we ask the GPU to clear the content of this attachment
-                // at the start of the drawing.
-                load: Clear,
-                // `store: Store` means that we ask the GPU to store the output of the draw in the
-                // actual image. We could also ask it to discard the result.
-                store: Store,
-                // `format: <ty>` indicates the type of the format of the image. This has to be one
-                // of the types of the `vulkano::format` module (or alternatively one of your
-                // structs that implements the `FormatDesc` trait). Here we use the same format as
-                // the swapchain.
-                format: graphics.swapchain.image_format(),
-                //
-                // `samples: 1` means that we ask the GPU to use one sample to determine the value
-                // of each pixel in the color attachment. We could use a larger value
-                // (multisampling) for antialiasing. An example of this can be found in
-                // msaa-renderpass.rs.
-                //
-                samples: 1,
-            },
-        },
-        pass: {
-            // We use the attachment named `color` as the one and only color attachment.
-            color: [color],
-            // No depth-stencil attachment is indicated with empty brackets.
-            depth_stencil: {},
-        },
-    )
-    .unwrap();
-
     // Before we draw we have to create what is called a pipeline. This is similar to an OpenGL
     // program, but much more specific.
     let pipeline = GraphicsPipeline::start()
         // We have to indicate which subpass of which render pass this pipeline is going to be used
         // in. The pipeline will only be usable from this particular subpass.
-        .render_pass(Subpass::from(render_pass.clone(), 0).unwrap())
+        .render_pass(Subpass::from(graphics.render_pass.clone(), 0).unwrap())
         // We need to indicate the layout of the vertices.
         .vertex_input_state(Vertex::per_vertex())
         // The content of the vertex buffer describes a list of triangles.
@@ -193,30 +150,6 @@ fn main() {
         // Now that our builder is filled, we call `build()` to obtain an actual pipeline.
         .build(graphics.device.clone())
         .unwrap();
-
-    // Dynamic viewports allow us to recreate just the viewport when the window is resized.
-    // Otherwise we would have to recreate the whole pipeline.
-    let viewport = Viewport {
-        origin: [0.0, 0.0],
-        dimensions: [0.0, 0.0],
-        depth_range: 0.0..1.0,
-    };
-
-    //
-    // The render pass we created above only describes the layout of our framebuffers. Before we
-    // can draw we also need to create the actual framebuffers.
-    //
-    // Since we need to draw to multiple images, we are going to create a different framebuffer for
-    // each image.
-    let (viewport, mut framebuffers) = window_size_dependent_setup(
-        &graphics.swapchain_images,
-        render_pass.clone(),
-        &viewport,
-    );
-
-    graphics.viewport = viewport;
-
-    // Initialization is finally finished!
 
     //
     // In some situations, the swapchain will become invalid by itself. This includes for example
@@ -259,112 +192,9 @@ fn main() {
                 graphics.recreate_swapchain = true;
             }
             Event::RedrawEventsCleared => {
-                //
-                // check if minized
-                //
-                if graphics.minimized() {
-                    return;
-                }
-
-                //
-                // It is important to call this function from time to time, otherwise resources
-                // will keep accumulating and you will eventually reach an out of memory error.
-                // Calling this function polls various fences in order to determine what the GPU
-                // has already processed, and frees the resources that are no longer needed.
-                //
-                graphics
-                    .previous_frame_end
-                    .as_mut()
-                    .unwrap()
-                    .cleanup_finished();
-
-                //
-                // Whenever the window resizes we need to recreate everything dependent on the
-                // window size. In this example that includes the swapchain, the framebuffers and
-                // the dynamic state viewport.
-                //
-                if graphics.recreate_swapchain {
-                    // Use the new dimensions of the window.
-
-                    let (new_swapchain, new_images) =
-                        match graphics
-                            .swapchain
-                            .recreate(vulkano::swapchain::SwapchainCreateInfo {
-                                image_extent: graphics.dimensions().into(),
-                                ..graphics.swapchain.create_info()
-                            }) {
-                            Ok(r) => r,
-                            //
-                            // This error tends to happen when the user is manually resizing the
-                            // window. Simply restarting the loop is the easiest way to fix this
-                            // issue.
-                            //
-                            Err(SwapchainCreationError::ImageExtentNotSupported { .. }) => return,
-                            Err(e) => panic!("failed to recreate swapchain: {e}"),
-                        };
-
-                    //
-                    // save new swapchain
-                    //
-                    graphics.swapchain = new_swapchain;
-
-                    //
-                    // Because framebuffers contains a reference to the old swapchain, we need to
-                    // recreate framebuffers as well.
-                    //
-                    let(vp, fbs) = window_size_dependent_setup(
-                        &new_images,
-                        render_pass.clone(),
-                        &graphics.viewport,
-                    );
-
-                    graphics.viewport = vp;
-                    framebuffers = fbs;
-
-                    //
-                    // swapchain has been recreated.
-                    //
-                    graphics.recreate_swapchain = false;
-                }
-
-                //
-                // Before we can draw on the output, we have to *acquire* an image from the
-                // swapchain. If no image is available (which happens if you submit draw commands
-                // too quickly), then the function will block. This operation returns the index of
-                // the image that we are allowed to draw upon.
-                //
-                // This function can block if no image is available. The parameter is an optional
-                // timeout after which the function call will return an error.
-                //
-                let (image_index, suboptimal, acquire_future) =
-                    match acquire_next_image(graphics.swapchain.clone(), None) {
-                        Ok(r) => r,
-                        Err(AcquireError::OutOfDate) => {
-                            graphics.recreate_swapchain = true;
-                            return;
-                        }
-                        Err(e) => panic!("failed to acquire next image: {e}"),
-                    };
-
-                // update
-                graphics.suboptimal = suboptimal;
-                graphics.acquire_future = Some(acquire_future);
-                graphics.image_index = image_index;
-
-                //
-                // `acquire_next_image` can be successful, but suboptimal. This means that the
-                // swapchain image will still work, but it may not display correctly. With some
-                // drivers this can be when the window resizes, but it may not cause the swapchain
-                // to become out of date.
-                //
-                if graphics.suboptimal {
-                    //
-                    // force recreation of swapchain
-                    //
-                    graphics.recreate_swapchain = true;
-                }
-
-                // graphics.begin().expect("failed to begin graphics");
+              
+                // begin frame
+                graphics.begin().expect("failed to begin graphics");
 
                 // Before we can start creating and recording command buffers, we need a way of allocating
                 // them. Vulkano provides a command buffer allocator, which manages raw Vulkan command pools
@@ -402,10 +232,10 @@ fn main() {
                             //
                             // Only attachments that have `LoadOp::Clear` are provided with clear
                             // values, any others should use `ClearValue::None` as the clear value.
-                            clear_values: vec![Some([0.0, 0.0, 1.0, 1.0].into())],
+                            clear_values: vec![Some([0.0, 1.0, 1.0, 1.0].into())],
 
                             ..RenderPassBeginInfo::framebuffer(
-                                framebuffers[graphics.image_index as usize].clone(),
+                                graphics.framebuffers[graphics.image_index as usize].clone(),
                             )
                         },
                         //
@@ -433,47 +263,8 @@ fn main() {
                 // Finish building the command buffer by calling `build`.
                 let command_buffer = builder.build().unwrap();
 
-                if !graphics.acquire_future.is_none() {
-                    //
-                    let future = graphics
-                        .previous_frame_end
-                        .take()
-                        .unwrap()
-                        .join(graphics.acquire_future.take().unwrap())
-                        .then_execute(graphics.queue.clone(), command_buffer)
-                        .unwrap()
-                        // The color output is now expected to contain our triangle. But in order to
-                        // show it on the screen, we have to *present* the image by calling
-                        // `then_swapchain_present`.
-                        //
-                        // This function does not actually present the image immediately. Instead it
-                        // submits a present command at the end of the queue. This means that it will
-                        // only be presented once the GPU has finished executing the command buffer
-                        // that draws the triangle.
-                        .then_swapchain_present(
-                            graphics.queue.clone(),
-                            SwapchainPresentInfo::swapchain_image_index(
-                                graphics.swapchain.clone(),
-                                graphics.image_index,
-                            ),
-                        )
-                        .then_signal_fence_and_flush();
-
-                    match future {
-                        Ok(future) => {
-                            graphics.previous_frame_end = Some(future.boxed());
-                        }
-                        Err(FlushError::OutOfDate) => {
-                            graphics.recreate_swapchain = true;
-                            graphics.previous_frame_end =
-                                Some(sync::now(graphics.device.clone()).boxed());
-                        }
-                        Err(e) => {
-                            panic!("failed to flush future: {e}");
-                            // previous_frame_end = Some(sync::now(device.clone()).boxed());
-                        }
-                    }
-                }
+                // end graphics
+                graphics.end(command_buffer).expect("failed to end graphics");
             }
             _ => (),
         }

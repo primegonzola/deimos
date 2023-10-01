@@ -3,8 +3,8 @@
 // #![allow(dead_code)]
 use anyhow::Result;
 use std::sync::Arc;
-use vulkano::sync::GpuFuture;
 use vulkano::image::ImageAccess;
+use vulkano::sync::GpuFuture;
 use vulkano_win::VkSurfaceBuild;
 use winit::dpi::PhysicalSize;
 use winit::{
@@ -356,12 +356,12 @@ impl Device {
 
     pub fn begin(&mut self) -> Result<()> {
         //
-        // Do not draw the frame when the screen dimensions are zero. On Windows, this can
-        // occur when minimizing the application.
+        // check if minized
         //
         if self.minimized() {
             return Ok(());
         }
+
         //
         // It is important to call this function from time to time, otherwise resources
         // will keep accumulating and you will eventually reach an out of memory error.
@@ -397,21 +397,15 @@ impl Device {
                     Err(e) => panic!("failed to recreate swapchain: {e}"),
                 };
 
-            //
             // save new swapchain
-            //
             self.swapchain = new_swapchain;
 
             //
             // Because framebuffers contains a reference to the old swapchain, we need to
             // recreate framebuffers as well.
             //
-            let (nvp, fbs) =
+            (self.viewport, self.framebuffers) =
                 window_size_dependent_setup(&new_images, self.render_pass.clone(), &self.viewport);
-
-            // overwrite
-            self.viewport = nvp;
-            self.framebuffers = fbs;
 
             // swapchain has been recreated.
             self.recreate_swapchain = false;
@@ -464,7 +458,7 @@ impl Device {
     ) -> Result<()> {
         // check if valid
         if !self.acquire_future.is_none() {
-            // get the future frame info
+            //
             let future = self
                 .previous_frame_end
                 .take()
