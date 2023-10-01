@@ -14,6 +14,9 @@ use std::ptr::copy_nonoverlapping as memcpy;
 use vulkanalia::prelude::v1_0::*;
 use vulkanalia::vk::DeviceSize;
 
+use super::CommandPool;
+use super::Queue;
+
 // #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Buffer {
@@ -108,6 +111,32 @@ impl Buffer {
 
         // unlock memory
         device.unmap_memory(self.memory);
+    }
+
+    pub unsafe fn copy(
+        device: &Device,
+        pool: &CommandPool,
+        queue: &Queue,
+        source: Buffer,
+        destination: Buffer,
+        size: vk::DeviceSize,
+    ) -> Result<()> {
+        // begin single buffer
+        let cb = CommandPool::begin_single(device, pool)?;
+
+        // copy buffer
+        device.cmd_copy_buffer(
+            cb.buffer,
+            source.buffer,
+            destination.buffer,
+            &[vk::BufferCopy::builder().size(size)],
+        );
+
+        // end single buffer
+        CommandPool::end_single(device, pool, queue, cb)?;
+
+        // all done
+        Ok(())
     }
 }
 

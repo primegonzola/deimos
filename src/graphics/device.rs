@@ -1638,7 +1638,7 @@ unsafe fn generate_mipmaps(
 
     // Mipmaps
 
-    let command_buffer = begin_single_time_commands(device, data)?;
+    let command_buffer = CommandPool::begin_single(device, &data.command_pool)?;
 
     let subresource = vk::ImageSubresourceRange::builder()
         .aspect_mask(vk::ImageAspectFlags::COLOR)
@@ -1754,7 +1754,12 @@ unsafe fn generate_mipmaps(
         &[barrier],
     );
 
-    end_single_time_commands(device, data, command_buffer)?;
+    CommandPool::end_single(
+        device,
+        &data.command_pool,
+        &data.graphics_queue,
+        command_buffer,
+    )?;
 
     Ok(())
 }
@@ -1885,7 +1890,14 @@ unsafe fn create_vertex_buffer(
     )?;
 
     // copy buffer
-    copy_buffer(device, data, staging_buffer, data.vertex_buffer, size)?;
+    Buffer::copy(
+        device,
+        &data.command_pool,
+        &data.graphics_queue,
+        staging_buffer,
+        data.vertex_buffer,
+        size,
+    )?;
 
     // clean
     staging_buffer.destroy(&device);
@@ -1926,7 +1938,14 @@ unsafe fn create_index_buffer(
     )?;
 
     // copy
-    copy_buffer(device, data, staging_buffer, data.index_buffer, size)?;
+    Buffer::copy(
+        device,
+        &data.command_pool,
+        &data.graphics_queue,
+        staging_buffer,
+        data.index_buffer,
+        size,
+    )?;
 
     // cleanup
     staging_buffer.destroy(&device);
@@ -2138,27 +2157,32 @@ impl SwapchainSupport {
     }
 }
 
-unsafe fn copy_buffer(
-    device: &Device,
-    data: &GraphicsDeviceData,
-    source: Buffer,
-    destination: Buffer,
-    size: vk::DeviceSize,
-) -> Result<()> {
-    let command_buffer = begin_single_time_commands(device, data)?;
+// unsafe fn copy_buffer(
+//     device: &Device,
+//     data: &GraphicsDeviceData,
+//     source: Buffer,
+//     destination: Buffer,
+//     size: vk::DeviceSize,
+// ) -> Result<()> {
+//     let command_buffer = CommandPool::begin_single(device, &data.command_pool)?;
 
-    let regions = vk::BufferCopy::builder().size(size);
-    device.cmd_copy_buffer(
-        command_buffer.buffer,
-        source.buffer,
-        destination.buffer,
-        &[regions],
-    );
+//     let regions = vk::BufferCopy::builder().size(size);
+//     device.cmd_copy_buffer(
+//         command_buffer.buffer,
+//         source.buffer,
+//         destination.buffer,
+//         &[regions],
+//     );
 
-    end_single_time_commands(device, data, command_buffer)?;
+//     CommandPool::end_single(
+//         device,
+//         &data.command_pool,
+//         &data.graphics_queue,
+//         command_buffer,
+//     )?;
 
-    Ok(())
-}
+//     Ok(())
+// }
 
 unsafe fn create_texture(
     instance: &Instance,
@@ -2244,7 +2268,7 @@ unsafe fn transition_image_layout(
             _ => return Err(anyhow!("Unsupported image layout transition!")),
         };
 
-    let command_buffer = begin_single_time_commands(device, data)?;
+    let command_buffer = CommandPool::begin_single(device, &data.command_pool)?;
 
     let subresource = vk::ImageSubresourceRange::builder()
         .aspect_mask(vk::ImageAspectFlags::COLOR)
@@ -2273,7 +2297,12 @@ unsafe fn transition_image_layout(
         &[barrier],
     );
 
-    end_single_time_commands(device, data, command_buffer)?;
+    CommandPool::end_single(
+        device,
+        &data.command_pool,
+        &data.graphics_queue,
+        command_buffer,
+    )?;
 
     Ok(())
 }
@@ -2286,7 +2315,8 @@ unsafe fn copy_buffer_to_image(
     width: u32,
     height: u32,
 ) -> Result<()> {
-    let command_buffer = begin_single_time_commands(device, data)?;
+    // get single command buffer
+    let command_buffer = CommandPool::begin_single(device, &data.command_pool)?;
 
     let subresource = vk::ImageSubresourceLayers::builder()
         .aspect_mask(vk::ImageAspectFlags::COLOR)
@@ -2314,7 +2344,13 @@ unsafe fn copy_buffer_to_image(
         &[region],
     );
 
-    end_single_time_commands(device, data, command_buffer)?;
+    // end single command buffer
+    CommandPool::end_single(
+        device,
+        &data.command_pool,
+        &data.graphics_queue,
+        command_buffer,
+    )?;
 
     Ok(())
 }
@@ -2334,26 +2370,4 @@ unsafe fn get_memory_type_index(
             suitable && memory_type.property_flags.contains(properties)
         })
         .ok_or_else(|| anyhow!("Failed to find suitable memory type."))
-}
-
-unsafe fn begin_single_time_commands(
-    device: &Device,
-    data: &GraphicsDeviceData,
-) -> Result<CommandBuffer> {
-    Ok(CommandPool::begin_single(device, &data.command_pool)?)
-}
-
-unsafe fn end_single_time_commands(
-    device: &Device,
-    data: &GraphicsDeviceData,
-    command_buffer: CommandBuffer,
-) -> Result<()> {
-    CommandPool::end_single(
-        device,
-        &data.command_pool,
-        &data.graphics_queue,
-        command_buffer,
-    )?;
-
-    Ok(())
 }
