@@ -14,7 +14,7 @@ use std::fs::File;
 use std::io::BufReader;
 use std::mem::size_of;
 use std::os::raw::c_void;
-use std::ptr::{copy_nonoverlapping as memcpy, slice_from_raw_parts};
+use std::ptr::slice_from_raw_parts;
 use std::time::Instant;
 
 use anyhow::{anyhow, Result};
@@ -414,7 +414,6 @@ impl GraphicsDevice {
     /// Updates the uniform buffer object for the app.
     unsafe fn update_uniform_buffer(&self, image_index: usize) -> Result<()> {
         // MVP
-
         let view = Mat4::look_at_rh(
             point3::<f32>(6.0, 0.0, 2.0),
             point3::<f32>(0.0, 0.0, 0.0),
@@ -437,22 +436,18 @@ impl GraphicsDevice {
                 10.0,
             );
 
+        // create ubo
         let ubo = UniformBufferObject { view, proj };
 
-        // Copy
-
-        let memory = self.device.map_memory(
-            self.data.uniform_buffers[image_index].memory,
+        // write ubo into buffer
+        self.data.uniform_buffers[image_index].write(
+            &self.device,
             0,
             size_of::<UniformBufferObject>() as u64,
-            vk::MemoryMapFlags::empty(),
-        )?;
+            &[ubo].to_vec(),
+        );
 
-        memcpy(&ubo, memory.cast(), 1);
-
-        self.device
-            .unmap_memory(self.data.uniform_buffers[image_index].memory);
-
+        // all went fine
         Ok(())
     }
 
