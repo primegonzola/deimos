@@ -196,7 +196,7 @@ fn main() {
 
     // Dynamic viewports allow us to recreate just the viewport when the window is resized.
     // Otherwise we would have to recreate the whole pipeline.
-    let mut viewport = Viewport {
+    let viewport = Viewport {
         origin: [0.0, 0.0],
         dimensions: [0.0, 0.0],
         depth_range: 0.0..1.0,
@@ -208,10 +208,10 @@ fn main() {
     //
     // Since we need to draw to multiple images, we are going to create a different framebuffer for
     // each image.
-    let mut framebuffers = window_size_dependent_setup(
+    let (mut viewport, mut framebuffers) = window_size_dependent_setup(
         &graphics.swapchain_images,
         render_pass.clone(),
-        &mut viewport,
+        &viewport,
     );
 
     // Initialization is finally finished!
@@ -257,22 +257,9 @@ fn main() {
                 graphics.recreate_swapchain = true;
             }
             Event::RedrawEventsCleared => {
-                // //
-                // // Do not draw the frame when the screen dimensions are zero. On Windows, this can
-                // // occur when minimizing the application.
-                // //
-                // let window = graphics
-                //     .surface
-                //     .object()
-                //     .unwrap()
-                //     .downcast_ref::<Window>()
-                //     .unwrap();
-                // let dimensions = window.inner_size();
-                // if dimensions.width == 0 || dimensions.height == 0 {
-                //     return;
-                // }
-
+                //
                 // check if minized
+                //
                 if graphics.minimized() {
                     return;
                 }
@@ -323,11 +310,14 @@ fn main() {
                     // Because framebuffers contains a reference to the old swapchain, we need to
                     // recreate framebuffers as well.
                     //
-                    framebuffers = window_size_dependent_setup(
+                    let(vp, fbs) = window_size_dependent_setup(
                         &new_images,
                         render_pass.clone(),
-                        &mut viewport,
+                        &viewport,
                     );
+
+                    viewport = vp;
+                    framebuffers = fbs;
 
                     //
                     // swapchain has been recreated.
@@ -488,34 +478,37 @@ fn main() {
     });
 }
 
-//
-// This function is called once during initialization,
-// and whenever the window is resized.
-//
 fn window_size_dependent_setup(
-    images: &[Arc<SwapchainImage>],
-    render_pass: Arc<RenderPass>,
-    viewport: &mut Viewport,
-) -> Vec<Arc<Framebuffer>> {
+    images: &[Arc<vulkano::image::SwapchainImage>],
+    render_pass: Arc<vulkano::render_pass::RenderPass>,
+    viewport: &vulkano::pipeline::graphics::viewport::Viewport,
+) -> (
+    vulkano::pipeline::graphics::viewport::Viewport,
+    Vec<Arc<vulkano::render_pass::Framebuffer>>,
+) {
     // get the dimensions
     let dimensions = images[0].dimensions().width_height();
-
-    // save into view port
-    viewport.dimensions = [dimensions[0] as f32, dimensions[1] as f32];
-
-    // loop over images and map them to framebuffers
-    images
-        .iter()
-        .map(|image| {
-            let view = ImageView::new_default(image.clone()).unwrap();
-            Framebuffer::new(
-                render_pass.clone(),
-                FramebufferCreateInfo {
-                    attachments: vec![view],
-                    ..Default::default()
-                },
-            )
-            .unwrap()
-        })
-        .collect::<Vec<_>>()
+    (
+        // create new view port using source
+        vulkano::pipeline::graphics::viewport::Viewport {
+            origin: [viewport.origin[0], viewport.origin[1]],
+            dimensions: [dimensions[0] as f32, dimensions[1] as f32],
+            depth_range: viewport.depth_range.clone(),
+        },
+        // loop over images and map them to framebuffers
+        images
+            .iter()
+            .map(|image| {
+                let view = vulkano::image::view::ImageView::new_default(image.clone()).unwrap();
+                vulkano::render_pass::Framebuffer::new(
+                    render_pass.clone(),
+                    vulkano::render_pass::FramebufferCreateInfo {
+                        attachments: vec![view],
+                        ..Default::default()
+                    },
+                )
+                .unwrap()
+            })
+            .collect::<Vec<_>>(),
+    )
 }

@@ -4,7 +4,7 @@
 use anyhow::Result;
 use std::sync::Arc;
 use vulkano::sync::GpuFuture;
-use vulkano::{device::physical::PhysicalDevice, image::ImageAccess};
+use vulkano::image::ImageAccess;
 use vulkano_win::VkSurfaceBuild;
 use winit::dpi::PhysicalSize;
 use winit::{
@@ -351,14 +351,7 @@ impl Device {
     }
 
     pub fn minimized(&self) -> bool {
-        let window = self
-            .surface
-            .object()
-            .unwrap()
-            .downcast_ref::<Window>()
-            .unwrap();
-        let dimensions = self.dimensions();
-        dimensions.width == 0 || dimensions.height == 0
+        self.dimensions().width == 0 || self.dimensions().height == 0
     }
 
     pub fn begin(&mut self) -> Result<()> {
