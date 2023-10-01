@@ -33,7 +33,7 @@ impl SwapChain {
         }
     }
 
-    fn get_swapchain_surface_format(formats: &[vk::SurfaceFormatKHR]) -> vk::SurfaceFormatKHR {
+    fn get_surface_format(formats: &[vk::SurfaceFormatKHR]) -> vk::SurfaceFormatKHR {
         formats
             .iter()
             .cloned()
@@ -44,7 +44,7 @@ impl SwapChain {
             .unwrap_or_else(|| formats[0])
     }
 
-    fn get_swapchain_present_mode(present_modes: &[vk::PresentModeKHR]) -> vk::PresentModeKHR {
+    fn get_present_mode(present_modes: &[vk::PresentModeKHR]) -> vk::PresentModeKHR {
         present_modes
             .iter()
             .cloned()
@@ -52,7 +52,7 @@ impl SwapChain {
             .unwrap_or(vk::PresentModeKHR::FIFO)
     }
 
-    fn get_swapchain_extent(
+    fn get_extent(
         window: &Window,
         capabilities: vk::SurfaceCapabilitiesKHR,
     ) -> vk::Extent2D {
@@ -86,9 +86,9 @@ impl SwapChain {
         let indices = QueueFamilyIndices::get(instance, surface, *physical)?;
         let support = SwapChainSupport::get(instance, surface, *physical)?;
 
-        let surface_format = SwapChain::get_swapchain_surface_format(&support.formats);
-        let present_mode = SwapChain::get_swapchain_present_mode(&support.present_modes);
-        let extent = SwapChain::get_swapchain_extent(window, support.capabilities);
+        let surface_format = SwapChain::get_surface_format(&support.formats);
+        let present_mode = SwapChain::get_present_mode(&support.present_modes);
+        let extent = SwapChain::get_extent(window, support.capabilities);
 
         let format = surface_format.format;
         let extent = extent;
