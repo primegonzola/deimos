@@ -319,7 +319,7 @@ fn main() {
                     // Because framebuffers contains a reference to the old swapchain, we need to
                     // recreate framebuffers as well.
                     //
-                    framebuffers = window_size_dependent_setup(
+                    graphics.framebuffers = window_size_dependent_setup(
                         &new_images,
                         render_pass.clone(),
                         &mut viewport,

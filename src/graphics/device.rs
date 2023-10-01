@@ -459,7 +459,7 @@ impl Device {
         command_buffer: vulkano::command_buffer::PrimaryAutoCommandBuffer,
     ) -> Result<()> {
         // check if valid
-        if (!self.acquire_future.is_none()) {
+        if !self.acquire_future.is_none() {
             // get the future frame info
             let future = self
                 .previous_frame_end
