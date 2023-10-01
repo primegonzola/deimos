@@ -2,34 +2,24 @@
 
 // #![allow(dead_code)]
 
-use std::sync::Arc;
 use vulkano::{
     buffer::{Buffer, BufferContents, BufferCreateInfo, BufferUsage},
     command_buffer::{
         allocator::StandardCommandBufferAllocator, AutoCommandBufferBuilder, CommandBufferUsage,
         RenderPassBeginInfo, SubpassContents,
     },
-    image::{view::ImageView, ImageAccess, SwapchainImage},
     memory::allocator::{AllocationCreateInfo, MemoryUsage, StandardMemoryAllocator},
     pipeline::{
         graphics::{
-            input_assembly::InputAssemblyState,
-            vertex_input::Vertex,
-            viewport::{Viewport, ViewportState},
+            input_assembly::InputAssemblyState, vertex_input::Vertex, viewport::ViewportState,
         },
         GraphicsPipeline,
     },
-    render_pass::{Framebuffer, FramebufferCreateInfo, RenderPass, Subpass},
-    swapchain::{
-        acquire_next_image, AcquireError, SwapchainCreateInfo, SwapchainCreationError,
-        SwapchainPresentInfo,
-    },
-    sync::{self, FlushError, GpuFuture},
+    render_pass::Subpass,
 };
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
-    window::Window,
 };
 
 // include the modules in the code graph
@@ -192,7 +182,6 @@ fn main() {
                 graphics.recreate_swapchain = true;
             }
             Event::RedrawEventsCleared => {
-              
                 // begin frame
                 graphics.begin().expect("failed to begin graphics");
 
@@ -264,44 +253,11 @@ fn main() {
                 let command_buffer = builder.build().unwrap();
 
                 // end graphics
-                graphics.end(command_buffer).expect("failed to end graphics");
+                graphics
+                    .end(command_buffer)
+                    .expect("failed to end graphics");
             }
             _ => (),
         }
     });
-}
-
-fn window_size_dependent_setup(
-    images: &[Arc<vulkano::image::SwapchainImage>],
-    render_pass: Arc<vulkano::render_pass::RenderPass>,
-    viewport: &vulkano::pipeline::graphics::viewport::Viewport,
-) -> (
-    vulkano::pipeline::graphics::viewport::Viewport,
-    Vec<Arc<vulkano::render_pass::Framebuffer>>,
-) {
-    // get the dimensions
-    let dimensions = images[0].dimensions().width_height();
-    (
-        // create new view port using source
-        vulkano::pipeline::graphics::viewport::Viewport {
-            origin: [viewport.origin[0], viewport.origin[1]],
-            dimensions: [dimensions[0] as f32, dimensions[1] as f32],
-            depth_range: viewport.depth_range.clone(),
-        },
-        // loop over images and map them to framebuffers
-        images
-            .iter()
-            .map(|image| {
-                let view = vulkano::image::view::ImageView::new_default(image.clone()).unwrap();
-                vulkano::render_pass::Framebuffer::new(
-                    render_pass.clone(),
-                    vulkano::render_pass::FramebufferCreateInfo {
-                        attachments: vec![view],
-                        ..Default::default()
-                    },
-                )
-                .unwrap()
-            })
-            .collect::<Vec<_>>(),
-    )
 }
