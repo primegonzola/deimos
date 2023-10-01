@@ -28,6 +28,12 @@ vulkano = { version="0.33", features = ["serde"] }
 # Provides the `shader!` macro that is used to generate code for using shaders.
 vulkano-shaders = "0.33"
 
+# Provides the window support
+vulkano-win = "0.33"
+
+# additional utilities
+vulkano-util = "0.33"
+
 #used to create a window to render to
 winit = "0.28"
 
