@@ -214,12 +214,6 @@ fn main() {
         &mut viewport,
     );
 
-    // Before we can start creating and recording command buffers, we need a way of allocating
-    // them. Vulkano provides a command buffer allocator, which manages raw Vulkan command pools
-    // underneath and provides a safe interface for them.
-    let command_buffer_allocator =
-        StandardCommandBufferAllocator::new(graphics.device.clone(), Default::default());
-
     // Initialization is finally finished!
 
     //
@@ -371,6 +365,14 @@ fn main() {
                     graphics.recreate_swapchain = true;
                 }
 
+                // Before we can start creating and recording command buffers, we need a way of allocating
+                // them. Vulkano provides a command buffer allocator, which manages raw Vulkan command pools
+                // underneath and provides a safe interface for them.
+                let command_buffer_allocator = StandardCommandBufferAllocator::new(
+                    graphics.device.clone(),
+                    Default::default(),
+                );
+
                 //
                 // In order to draw, we have to build a *command buffer*. The command buffer object
                 // holds the list of commands that are going to be executed.
@@ -402,7 +404,7 @@ fn main() {
                             clear_values: vec![Some([0.0, 0.0, 1.0, 1.0].into())],
 
                             ..RenderPassBeginInfo::framebuffer(
-                                framebuffers[image_index as usize].clone(),
+                                framebuffers[graphics.image_index as usize].clone(),
                             )
                         },
                         //
@@ -451,7 +453,7 @@ fn main() {
                             graphics.queue.clone(),
                             SwapchainPresentInfo::swapchain_image_index(
                                 graphics.swapchain.clone(),
-                                image_index,
+                                graphics.image_index,
                             ),
                         )
                         .then_signal_fence_and_flush();
