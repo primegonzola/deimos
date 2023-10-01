@@ -50,10 +50,10 @@ pub struct CommandPool {
 }
 
 impl CommandPool {
-    pub fn create(pool: vk::CommandPool) -> Self {
+    pub fn new(pool: vk::CommandPool) -> Self {
         Self { pool }
     }
-
+    
     pub unsafe fn destroy(&self, device: &Device) {
         // destroy the pool
         device.destroy_command_pool(self.pool, None);
@@ -63,7 +63,7 @@ impl CommandPool {
 impl Default for CommandPool {
     #[inline]
     fn default() -> Self {
-        CommandPool::create(vk::CommandPool::null())
+        CommandPool::new(vk::CommandPool::null())
     }
 }
 

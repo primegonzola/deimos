@@ -46,18 +46,18 @@ use super::TextureView;
 use super::UniformBufferObject;
 use super::Vertex;
 
-/// Whether the validation layers should be enabled.
+// Whether the validation layers should be enabled.
 const VALIDATION_ENABLED: bool = cfg!(debug_assertions);
-/// The name of the validation layers.
+// The name of the validation layers.
 const VALIDATION_LAYER: vk::ExtensionName =
     vk::ExtensionName::from_bytes(b"VK_LAYER_KHRONOS_validation");
 
-/// The required device extensions.
+// The required device extensions.
 const DEVICE_EXTENSIONS: &[vk::ExtensionName] = &[vk::KHR_SWAPCHAIN_EXTENSION.name];
 /// The Vulkan SDK version that started requiring the portability subset extension for macOS.
 const PORTABILITY_MACOS_VERSION: Version = Version::new(1, 3, 216);
 
-/// The maximum number of frames that can be processed concurrently.
+// The maximum number of frames that can be processed concurrently.
 const MAX_FRAMES_IN_FLIGHT: usize = 2;
 
 type Vec2 = cgmath::Vector2<f32>;
@@ -677,10 +677,6 @@ struct GraphicsDeviceData {
     textures_in_flight: Vec<vk::Fence>,
 }
 
-//================================================
-// Instance
-//================================================
-
 unsafe fn create_instance(
     window: &Window,
     entry: &Entry,
@@ -788,10 +784,6 @@ extern "system" fn debug_callback(
     vk::FALSE
 }
 
-//================================================
-// Physical Device
-//================================================
-
 #[derive(Debug, Error)]
 #[error("{0}")]
 pub struct SuitabilityError(pub &'static str);
@@ -878,10 +870,6 @@ unsafe fn get_max_msaa_samples(
     .unwrap_or(vk::SampleCountFlags::_1)
 }
 
-//================================================
-// Logical Device
-//================================================
-
 unsafe fn create_logical_device(
     entry: &Entry,
     instance: &Instance,
@@ -950,10 +938,6 @@ unsafe fn create_logical_device(
 
     Ok(device)
 }
-
-//================================================
-// Swapchain
-//================================================
 
 unsafe fn create_swapchain(
     window: &Window,
@@ -1081,10 +1065,6 @@ unsafe fn create_swapchain_views(device: &Device, data: &mut GraphicsDeviceData)
 
     Ok(())
 }
-
-//================================================
-// Pipeline
-//================================================
 
 unsafe fn create_render_pass(
     instance: &Instance,
@@ -1361,7 +1341,6 @@ unsafe fn create_pipeline(
     Ok(())
 }
 
-
 unsafe fn create_framebuffers(device: &Device, data: &mut GraphicsDeviceData) -> Result<()> {
     data.framebuffers = data
         .swapchain_image_views
@@ -1388,10 +1367,6 @@ unsafe fn create_framebuffers(device: &Device, data: &mut GraphicsDeviceData) ->
 
     Ok(())
 }
-
-//================================================
-// Command Pool
-//================================================
 
 unsafe fn create_command_pools(
     instance: &Instance,
@@ -1428,14 +1403,10 @@ unsafe fn create_command_pool(
         .flags(vk::CommandPoolCreateFlags::TRANSIENT)
         .queue_family_index(indices.graphics);
 
-    Ok(CommandPool::create(
+    Ok(CommandPool::new(
         device.create_command_pool(&info, None)?,
     ))
 }
-
-//================================================
-// Color Objects
-//================================================
 
 unsafe fn create_color_objects(
     instance: &Instance,
