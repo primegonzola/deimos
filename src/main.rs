@@ -235,7 +235,6 @@ fn main() {
     //
     // let mut recreate_swapchain = false;
 
-
     //
     // In the loop below we are going to submit commands to the GPU. Submitting a command produces
     // an object that implements the `GpuFuture` trait, which holds the resources for as long as
@@ -285,7 +284,11 @@ fn main() {
                 // Calling this function polls various fences in order to determine what the GPU
                 // has already processed, and frees the resources that are no longer needed.
                 //
-                graphics.previous_frame_end.as_mut().unwrap().cleanup_finished();
+                graphics
+                    .previous_frame_end
+                    .as_mut()
+                    .unwrap()
+                    .cleanup_finished();
 
                 //
                 // Whenever the window resizes we need to recreate everything dependent on the
@@ -319,7 +322,7 @@ fn main() {
                     // Because framebuffers contains a reference to the old swapchain, we need to
                     // recreate framebuffers as well.
                     //
-                    graphics.framebuffers = window_size_dependent_setup(
+                    framebuffers = window_size_dependent_setup(
                         &new_images,
                         render_pass.clone(),
                         &mut viewport,
@@ -350,13 +353,18 @@ fn main() {
                         Err(e) => panic!("failed to acquire next image: {e}"),
                     };
 
+                // update
+                graphics.suboptimal = suboptimal;
+                graphics.acquire_future = Some(acquire_future);
+                graphics.image_index = image_index;
+
                 //
                 // `acquire_next_image` can be successful, but suboptimal. This means that the
                 // swapchain image will still work, but it may not display correctly. With some
                 // drivers this can be when the window resizes, but it may not cause the swapchain
                 // to become out of date.
                 //
-                if suboptimal {
+                if graphics.suboptimal {
                     //
                     // force recreation of swapchain
                     //
@@ -422,40 +430,45 @@ fn main() {
                 // Finish building the command buffer by calling `build`.
                 let command_buffer = builder.build().unwrap();
 
-                let future = graphics.previous_frame_end
-                    .take()
-                    .unwrap()
-                    .join(acquire_future)
-                    .then_execute(graphics.queue.clone(), command_buffer)
-                    .unwrap()
-                    // The color output is now expected to contain our triangle. But in order to
-                    // show it on the screen, we have to *present* the image by calling
-                    // `then_swapchain_present`.
+                if !graphics.acquire_future.is_none() {
                     //
-                    // This function does not actually present the image immediately. Instead it
-                    // submits a present command at the end of the queue. This means that it will
-                    // only be presented once the GPU has finished executing the command buffer
-                    // that draws the triangle.
-                    .then_swapchain_present(
-                        graphics.queue.clone(),
-                        SwapchainPresentInfo::swapchain_image_index(
-                            graphics.swapchain.clone(),
-                            image_index,
-                        ),
-                    )
-                    .then_signal_fence_and_flush();
+                    let future = graphics
+                        .previous_frame_end
+                        .take()
+                        .unwrap()
+                        .join(graphics.acquire_future.take().unwrap())
+                        .then_execute(graphics.queue.clone(), command_buffer)
+                        .unwrap()
+                        // The color output is now expected to contain our triangle. But in order to
+                        // show it on the screen, we have to *present* the image by calling
+                        // `then_swapchain_present`.
+                        //
+                        // This function does not actually present the image immediately. Instead it
+                        // submits a present command at the end of the queue. This means that it will
+                        // only be presented once the GPU has finished executing the command buffer
+                        // that draws the triangle.
+                        .then_swapchain_present(
+                            graphics.queue.clone(),
+                            SwapchainPresentInfo::swapchain_image_index(
+                                graphics.swapchain.clone(),
+                                image_index,
+                            ),
+                        )
+                        .then_signal_fence_and_flush();
 
-                match future {
-                    Ok(future) => {
-                        graphics.previous_frame_end = Some(future.boxed());
-                    }
-                    Err(FlushError::OutOfDate) => {
-                        graphics.recreate_swapchain = true;
-                        graphics.previous_frame_end = Some(sync::now(graphics.device.clone()).boxed());
-                    }
-                    Err(e) => {
-                        panic!("failed to flush future: {e}");
-                        // previous_frame_end = Some(sync::now(device.clone()).boxed());
+                    match future {
+                        Ok(future) => {
+                            graphics.previous_frame_end = Some(future.boxed());
+                        }
+                        Err(FlushError::OutOfDate) => {
+                            graphics.recreate_swapchain = true;
+                            graphics.previous_frame_end =
+                                Some(sync::now(graphics.device.clone()).boxed());
+                        }
+                        Err(e) => {
+                            panic!("failed to flush future: {e}");
+                            // previous_frame_end = Some(sync::now(device.clone()).boxed());
+                        }
                     }
                 }
             }
