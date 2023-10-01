@@ -94,6 +94,7 @@ impl GraphicsDevice {
         let device = create_logical_device(&entry, &instance, &surface, &physical, &mut data)?;
 
         create_swapchain(window, &instance, &surface, &physical, &device, &mut data)?;
+        create_swapchain_textures(&device, &mut data)?;
         create_swapchain_views(&device, &mut data)?;
 
         create_render_pass(&instance, &physical, &samples, &device, &mut data)?;
@@ -466,6 +467,7 @@ impl GraphicsDevice {
             &self.device,
             &mut self.data,
         )?;
+        create_swapchain_textures(&self.device, &mut self.data)?;
         create_swapchain_views(&self.device, &mut self.data)?;
         create_render_pass(
             &self.instance,
@@ -989,14 +991,6 @@ unsafe fn create_swapchain(
     // create swap chain
     data.swapchain = device.create_swapchain_khr(&info, None)?;
 
-    // get swap chain images
-    let images = device.get_swapchain_images_khr(data.swapchain)?;
-
-    // map into textures
-    data.swapchain_textures = images
-        .iter()
-        .map(|i| Texture::create(*i, vk::DeviceMemory::null()))
-        .collect::<Vec<_>>();
     Ok(())
 }
 
@@ -1038,6 +1032,19 @@ fn get_swapchain_extent(window: &Window, capabilities: vk::SurfaceCapabilitiesKH
             ))
             .build()
     }
+}
+
+unsafe fn create_swapchain_textures(device: &Device, data: &mut GraphicsDeviceData) -> Result<()> {
+    // get swap chain images
+    let images = device.get_swapchain_images_khr(data.swapchain)?;
+
+    // map into textures
+    data.swapchain_textures = images
+        .iter()
+        .map(|i| Texture::create(*i, vk::DeviceMemory::null()))
+        .collect::<Vec<_>>();
+
+    Ok(())
 }
 
 unsafe fn create_swapchain_views(device: &Device, data: &mut GraphicsDeviceData) -> Result<()> {
@@ -2083,7 +2090,6 @@ unsafe fn create_sync_objects(device: &Device, data: &mut GraphicsDeviceData) ->
 
     Ok(())
 }
-
 
 unsafe fn create_texture(
     instance: &Instance,
