@@ -3,10 +3,12 @@
 // #![allow(dead_code)]
 
 use anyhow::Result;
-use winit::dpi::LogicalSize;
-use winit::event::{ElementState, Event, VirtualKeyCode, WindowEvent};
-use winit::event_loop::{ControlFlow, EventLoop};
-use winit::window::WindowBuilder;
+use winit::{
+    dpi::LogicalSize,
+    event::{ElementState, Event, VirtualKeyCode, WindowEvent},
+    event_loop::{ControlFlow, EventLoop},
+    window::WindowBuilder,
+};
 
 mod app;
 mod graphics;
