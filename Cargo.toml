@@ -6,16 +6,34 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+
+# used for simple error handling
 anyhow = "1"
-log = "0.4"
+
+# used as a replacement for GLM (graphics math library)
 cgmath = "0.18"
+
+# used for logging statements
+log = "0.4"
+
+# used to load PNGs to use as textures
 png = "0.17"
+
+# used to print our logs to the console
 pretty_env_logger = "0.4"
-thiserror = "1"
-tobj = { version = "3", features = ["log"] }
-vulkanalia = { version = "=0.22.0", features = ["libloading", "provisional", "window"] }
+
+# The `vulkano` crate is the main crate that you must use to use Vulkan.
+vulkano = { version="0.33", features = ["serde"] }
+
+# Provides the `shader!` macro that is used to generate code for using shaders.
+vulkano-shaders = "0.33"
+
+#used to create a window to render to
 winit = "0.28"
 
+# thiserror = "1"
+# tobj = { version = "3", features = ["log"] }
+# vulkanalia = { version = "=0.22.0", features = ["libloading", "provisional", "window"] }
 # anyhow – used for simple error handling
 # log – used for logging statements
 # cgmath – used as a Rust replacement for GLM (graphics math library)
