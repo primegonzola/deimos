@@ -21,7 +21,6 @@ use anyhow::{anyhow, Result};
 use cgmath::{point3, vec2, vec3, Deg};
 use log::*;
 use thiserror::Error;
-use vulkanalia::bytecode::Bytecode;
 use vulkanalia::loader::{LibloadingLoader, LIBRARY};
 use vulkanalia::prelude::v1_0::*;
 use vulkanalia::window as vk_window;
@@ -89,10 +88,10 @@ impl GraphicsDevice {
         let instance = create_instance(window, &entry, &mut data)?;
         let surface = vk_window::create_surface(&instance, &window, &window)?;
         let physical = pick_physical_device(&instance, &surface, &mut data)?;
-        let samples =  get_max_msaa_samples(&instance, &physical);
-        let device = create_logical_device(&entry, &instance, &surface, & physical, &mut data)?;
+        let samples = get_max_msaa_samples(&instance, &physical);
+        let device = create_logical_device(&entry, &instance, &surface, &physical, &mut data)?;
 
-        create_swapchain(window, &instance, &surface,&physical, &device, &mut data)?;
+        create_swapchain(window, &instance, &surface, &physical, &device, &mut data)?;
         create_swapchain_views(&device, &mut data)?;
 
         create_render_pass(&instance, &physical, &samples, &device, &mut data)?;
@@ -100,16 +99,16 @@ impl GraphicsDevice {
 
         create_pipeline(&device, &samples, &mut data)?;
         create_command_pools(&instance, &surface, &physical, &device, &mut data)?;
-        create_color_objects(&instance, &physical, &samples,  &device, &mut data)?;
-        create_depth_objects(&instance, &physical, &samples,  &device, &mut data)?;
+        create_color_objects(&instance, &physical, &samples, &device, &mut data)?;
+        create_depth_objects(&instance, &physical, &samples, &device, &mut data)?;
         create_framebuffers(&device, &mut data)?;
         create_texture_image(&instance, &physical, &device, &mut data)?;
         create_texture_image_view(&device, &mut data)?;
         create_texture_sampler(&device, &mut data)?;
         load_model(&mut data)?;
         create_vertex_buffer(&instance, &physical, &device, &mut data)?;
-        create_index_buffer(&instance,&physical, &device, &mut data)?;
-        create_uniform_buffers(&instance,&physical, &device, &mut data)?;
+        create_index_buffer(&instance, &physical, &device, &mut data)?;
+        create_uniform_buffers(&instance, &physical, &device, &mut data)?;
         create_descriptor_pool(&device, &mut data)?;
         create_descriptor_sets(&device, &mut data)?;
         create_command_buffers(&device, &mut data)?;
@@ -185,8 +184,11 @@ impl GraphicsDevice {
         self.device.reset_fences(&[in_flight_fence])?;
 
         // submit buffers to que
-        self.device
-            .queue_submit(self.data.graphics_queue.queue, &[submit_info], in_flight_fence)?;
+        self.device.queue_submit(
+            self.data.graphics_queue.queue,
+            &[submit_info],
+            in_flight_fence,
+        )?;
 
         // get the swapchain
         let swapchains = &[self.data.swapchain];
@@ -230,25 +232,30 @@ impl GraphicsDevice {
 
     /// Updates a command buffer for our the app.
     // #[rustfmt::skip]
-    unsafe fn update_command_buffer(&mut self, index: usize, count:usize) -> Result<()> {
+    unsafe fn update_command_buffer(&mut self, index: usize, count: usize) -> Result<()> {
         // reset command pool
-        self.device.reset_command_pool(self.data.command_pools[index].pool, vk::CommandPoolResetFlags::empty())?;
+        self.device.reset_command_pool(
+            self.data.command_pools[index].pool,
+            vk::CommandPoolResetFlags::empty(),
+        )?;
 
         // get the command buffer associated
         let command_buffer = self.data.primary_command_buffers[index];
 
         // prepare command info
-        let info = vk::CommandBufferBeginInfo::builder().flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+        let info = vk::CommandBufferBeginInfo::builder()
+            .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
 
         // begin the command
-        self.device.begin_command_buffer(command_buffer.buffer, &info)?;
+        self.device
+            .begin_command_buffer(command_buffer.buffer, &info)?;
 
         // define render area
         let render_area = vk::Rect2D::builder()
             .offset(vk::Offset2D::default())
             .extent(self.data.swapchain_extent);
 
-            // define clear value used for color
+        // define clear value used for color
         let color_clear_value = vk::ClearValue {
             color: vk::ClearColorValue {
                 float32: [0.0, 0.0, 0.0, 1.0],
@@ -257,7 +264,10 @@ impl GraphicsDevice {
 
         // define clear value used for depth
         let depth_clear_value = vk::ClearValue {
-            depth_stencil: vk::ClearDepthStencilValue { depth: 1.0, stencil: 0 },
+            depth_stencil: vk::ClearDepthStencilValue {
+                depth: 1.0,
+                stencil: 0,
+            },
         };
 
         let clear_values = &[color_clear_value, depth_clear_value];
@@ -267,17 +277,25 @@ impl GraphicsDevice {
             .render_area(render_area)
             .clear_values(clear_values);
 
-        self.device.cmd_begin_render_pass(command_buffer.buffer, &info, vk::SubpassContents::SECONDARY_COMMAND_BUFFERS);
+        self.device.cmd_begin_render_pass(
+            command_buffer.buffer,
+            &info,
+            vk::SubpassContents::SECONDARY_COMMAND_BUFFERS,
+        );
 
         let secondary_command_buffers = (0..count)
             .map(|i| self.update_secondary_command_buffer(index, i))
             .collect::<Result<Vec<_>, _>>()?;
-        
+
         // get the secondary command buffers
-        let bf = secondary_command_buffers.iter().map(|b| b.buffer).collect::<Vec<_>>();
+        let bf = secondary_command_buffers
+            .iter()
+            .map(|b| b.buffer)
+            .collect::<Vec<_>>();
 
         // execute the command buffer
-        self.device.cmd_execute_commands(command_buffer.buffer, &bf[..]);
+        self.device
+            .cmd_execute_commands(command_buffer.buffer, &bf[..]);
 
         // end the render pass
         self.device.cmd_end_render_pass(command_buffer.buffer);
@@ -289,7 +307,7 @@ impl GraphicsDevice {
     }
 
     /// Updates a secondary command buffer for the app.
-    #[rustfmt::skip]
+    // #[rustfmt::skip]
     unsafe fn update_secondary_command_buffer(
         &mut self,
         image_index: usize,
@@ -305,7 +323,7 @@ impl GraphicsDevice {
                 .command_buffer_count(1);
 
             let command_buffer = self.device.allocate_command_buffers(&allocate_info)?[0];
-            command_buffers.push(CommandBuffer::create(command_buffer));
+            command_buffers.push(CommandBuffer::new(command_buffer));
         }
 
         let command_buffer = command_buffers[model_index];
@@ -317,15 +335,11 @@ impl GraphicsDevice {
 
         let time = self.start.elapsed().as_secs_f32();
 
-        let model = Mat4::from_translation(vec3(0.0, y, z)) * Mat4::from_axis_angle(
-            vec3(0.0, 0.0, 1.0),
-            Deg(90.0) * time
-        );
+        let model = Mat4::from_translation(vec3(0.0, y, z))
+            * Mat4::from_axis_angle(vec3(0.0, 0.0, 1.0), Deg(90.0) * time);
 
-        let model_bytes = &*slice_from_raw_parts(
-            &model as *const Mat4 as *const u8,
-            size_of::<Mat4>()
-        );
+        let model_bytes =
+            &*slice_from_raw_parts(&model as *const Mat4 as *const u8, size_of::<Mat4>());
 
         let opacity = (model_index + 1) as f32 * 0.25;
         let opacity_bytes = &opacity.to_ne_bytes()[..];
@@ -341,11 +355,26 @@ impl GraphicsDevice {
             .flags(vk::CommandBufferUsageFlags::RENDER_PASS_CONTINUE)
             .inheritance_info(&inheritance_info);
 
-        self.device.begin_command_buffer(command_buffer.buffer, &info)?;
+        self.device
+            .begin_command_buffer(command_buffer.buffer, &info)?;
 
-        self.device.cmd_bind_pipeline(command_buffer.buffer, vk::PipelineBindPoint::GRAPHICS, self.data.pipeline);
-        self.device.cmd_bind_vertex_buffers(command_buffer.buffer, 0, &[self.data.vertex_buffer.buffer], &[0]);
-        self.device.cmd_bind_index_buffer(command_buffer.buffer, self.data.index_buffer.buffer, 0, vk::IndexType::UINT32);
+        self.device.cmd_bind_pipeline(
+            command_buffer.buffer,
+            vk::PipelineBindPoint::GRAPHICS,
+            self.data.pipeline,
+        );
+        self.device.cmd_bind_vertex_buffers(
+            command_buffer.buffer,
+            0,
+            &[self.data.vertex_buffer.buffer],
+            &[0],
+        );
+        self.device.cmd_bind_index_buffer(
+            command_buffer.buffer,
+            self.data.index_buffer.buffer,
+            0,
+            vk::IndexType::UINT32,
+        );
         self.device.cmd_bind_descriptor_sets(
             command_buffer.buffer,
             vk::PipelineBindPoint::GRAPHICS,
@@ -368,7 +397,14 @@ impl GraphicsDevice {
             64,
             opacity_bytes,
         );
-        self.device.cmd_draw_indexed(command_buffer.buffer, self.data.indices.len() as u32, 1, 0, 0, 0);
+        self.device.cmd_draw_indexed(
+            command_buffer.buffer,
+            self.data.indices.len() as u32,
+            1,
+            0,
+            0,
+            0,
+        );
 
         self.device.end_command_buffer(command_buffer.buffer)?;
 
@@ -421,43 +457,82 @@ impl GraphicsDevice {
     }
 
     /// Recreates the swapchain for the app.
-    #[rustfmt::skip]
+    // #[rustfmt::skip]
     unsafe fn recreate_swapchain(&mut self, window: &Window) -> Result<()> {
         self.device.device_wait_idle()?;
         self.destroy_swapchain();
-        create_swapchain(window, &self.instance, &self.surface,&self.physical, &self.device, &mut self.data)?;
+        create_swapchain(
+            window,
+            &self.instance,
+            &self.surface,
+            &self.physical,
+            &self.device,
+            &mut self.data,
+        )?;
         create_swapchain_views(&self.device, &mut self.data)?;
-        create_render_pass(&self.instance, &self.physical, &self.samples, &self.device, &mut self.data)?;
+        create_render_pass(
+            &self.instance,
+            &self.physical,
+            &self.samples,
+            &self.device,
+            &mut self.data,
+        )?;
         create_pipeline(&self.device, &self.samples, &mut self.data)?;
-        create_color_objects(&self.instance,&self.physical, &self.samples, &self.device, &mut self.data)?;
-        create_depth_objects(&self.instance,&self.physical,  &self.samples, &self.device, &mut self.data)?;
+        create_color_objects(
+            &self.instance,
+            &self.physical,
+            &self.samples,
+            &self.device,
+            &mut self.data,
+        )?;
+        create_depth_objects(
+            &self.instance,
+            &self.physical,
+            &self.samples,
+            &self.device,
+            &mut self.data,
+        )?;
         create_framebuffers(&self.device, &mut self.data)?;
         create_uniform_buffers(&self.instance, &self.physical, &self.device, &mut self.data)?;
         create_descriptor_pool(&self.device, &mut self.data)?;
         create_descriptor_sets(&self.device, &mut self.data)?;
         create_command_buffers(&self.device, &mut self.data)?;
-        self.data.textures_in_flight.resize(self.data.swapchain_images.len(), vk::Fence::null());
+        self.data
+            .textures_in_flight
+            .resize(self.data.swapchain_images.len(), vk::Fence::null());
         Ok(())
     }
 
     /// Destroys the app.
-    #[rustfmt::skip]
+    // #[rustfmt::skip]
     pub unsafe fn destroy(&mut self) {
         self.device.device_wait_idle().unwrap();
 
         self.destroy_swapchain();
 
-        self.data.in_flight_fences.iter().for_each(|f| self.device.destroy_fence(*f, None));
-        self.data.render_finished_semaphores.iter().for_each(|s| self.device.destroy_semaphore(*s, None));
-        self.data.textures_available_semaphores.iter().for_each(|s| self.device.destroy_semaphore(*s, None));
-        self.data.command_pools.iter().for_each(|p| p.destroy(&self.device));
-        
+        self.data
+            .in_flight_fences
+            .iter()
+            .for_each(|f| self.device.destroy_fence(*f, None));
+        self.data
+            .render_finished_semaphores
+            .iter()
+            .for_each(|s| self.device.destroy_semaphore(*s, None));
+        self.data
+            .textures_available_semaphores
+            .iter()
+            .for_each(|s| self.device.destroy_semaphore(*s, None));
+        self.data
+            .command_pools
+            .iter()
+            .for_each(|p| p.destroy(&self.device));
+
         // destroy index buffer
         self.data.index_buffer.destroy(&self.device);
 
         // destroy vertex buffer
         self.data.vertex_buffer.destroy(&self.device);
-        
+
         // destroy material sampler
         self.data.material_texture_sampler.destroy(&self.device);
 
@@ -470,16 +545,18 @@ impl GraphicsDevice {
         // destroy command pool
         self.data.command_pool.destroy(&self.device);
         //
-        self.device.destroy_descriptor_set_layout(self.data.descriptor_set_layout, None);
-       
-        // destroy device 
+        self.device
+            .destroy_descriptor_set_layout(self.data.descriptor_set_layout, None);
+
+        // destroy device
         self.device.destroy_device(None);
-        
+
         // destroy surface
         self.instance.destroy_surface_khr(self.surface, None);
 
         if VALIDATION_ENABLED {
-            self.instance.destroy_debug_utils_messenger_ext(self.data.messenger, None);
+            self.instance
+                .destroy_debug_utils_messenger_ext(self.data.messenger, None);
         }
 
         // destroy instance
@@ -489,7 +566,6 @@ impl GraphicsDevice {
     /// Destroys the parts of the app related to the swapchain.
     // #[rustfmt::skip]
     unsafe fn destroy_swapchain(&mut self) {
-
         // destroy descriptor pool
         self.device
             .destroy_descriptor_pool(self.data.descriptor_pool.pool, None);
@@ -511,7 +587,7 @@ impl GraphicsDevice {
         self.data
             .framebuffers
             .iter()
-            .for_each(|f|f.destroy(&self.device));
+            .for_each(|f| f.destroy(&self.device));
 
         // destroy pipeline
         self.device.destroy_pipeline(self.data.pipeline, None);
@@ -552,7 +628,7 @@ struct GraphicsDeviceData {
     // pipeline
     render_pass: RenderPass,
     descriptor_set_layout: vk::DescriptorSetLayout,
-    
+
     pipeline_layout: vk::PipelineLayout,
     pipeline: vk::Pipeline,
 
@@ -720,7 +796,11 @@ extern "system" fn debug_callback(
 #[error("{0}")]
 pub struct SuitabilityError(pub &'static str);
 
-unsafe fn pick_physical_device(instance: &Instance, surface: &vk::SurfaceKHR, data: &mut GraphicsDeviceData) -> Result<vk::PhysicalDevice> {
+unsafe fn pick_physical_device(
+    instance: &Instance,
+    surface: &vk::SurfaceKHR,
+    data: &mut GraphicsDeviceData,
+) -> Result<vk::PhysicalDevice> {
     for physical_device in instance.enumerate_physical_devices()? {
         let properties = instance.get_physical_device_properties(physical_device);
 
@@ -929,11 +1009,11 @@ unsafe fn create_swapchain(
         .clipped(true)
         .old_swapchain(vk::SwapchainKHR::null());
 
-        // create swap chain
+    // create swap chain
     data.swapchain = device.create_swapchain_khr(&info, None)?;
 
     // data.swapchain_images = device.get_swapchain_images_khr(data.swapchain)?;
- 
+
     // get swap chain images
     let images = device.get_swapchain_images_khr(data.swapchain)?;
 
@@ -985,15 +1065,17 @@ fn get_swapchain_extent(window: &Window, capabilities: vk::SurfaceCapabilitiesKH
     }
 }
 
-unsafe fn create_swapchain_views(
-    device: &Device,
-    data: &mut GraphicsDeviceData,
-) -> Result<()> {
+unsafe fn create_swapchain_views(device: &Device, data: &mut GraphicsDeviceData) -> Result<()> {
     data.swapchain_image_views = data
         .swapchain_images
         .iter()
         .map(|i| {
-            i.create_view(device, data.swapchain_format, vk::ImageAspectFlags::COLOR, 1)
+            i.create_view(
+                device,
+                data.swapchain_format,
+                vk::ImageAspectFlags::COLOR,
+                1,
+            )
         })
         .collect::<Result<Vec<_>, _>>()?;
 
@@ -1128,16 +1210,17 @@ unsafe fn create_descriptor_set_layout(
 }
 
 unsafe fn create_pipeline(
-    device: &Device, 
+    device: &Device,
     samples: &vk::SampleCountFlags,
-    data: &mut GraphicsDeviceData) -> Result<()> {
+    data: &mut GraphicsDeviceData,
+) -> Result<()> {
     // Stages
 
     let vert = include_bytes!("../../shaders/vert.spv");
     let frag = include_bytes!("../../shaders/frag.spv");
 
-    let vertex_shader = create_shader_module(device, &vert[..])?;
-    let fragment_shader = create_shader_module(device, &frag[..])?;
+    let vertex_shader = Shader::create(device, &vert[..])?;
+    let fragment_shader = Shader::create(device, &frag[..])?;
 
     let vert_stage = vk::PipelineShaderStageCreateInfo::builder()
         .stage(vk::ShaderStageFlags::VERTEX)
@@ -1278,19 +1361,6 @@ unsafe fn create_pipeline(
     Ok(())
 }
 
-unsafe fn create_shader_module(device: &Device, bytecode: &[u8]) -> Result<Shader> {
-    let bytecode = Bytecode::new(bytecode).unwrap();
-
-    let info = vk::ShaderModuleCreateInfo::builder()
-        .code_size(bytecode.code_size())
-        .code(bytecode.code());
-
-    Ok(Shader::create(device.create_shader_module(&info, None)?))
-}
-
-//================================================
-// Framebuffers
-//================================================
 
 unsafe fn create_framebuffers(device: &Device, data: &mut GraphicsDeviceData) -> Result<()> {
     data.framebuffers = data
@@ -1308,8 +1378,11 @@ unsafe fn create_framebuffers(device: &Device, data: &mut GraphicsDeviceData) ->
                 .width(data.swapchain_extent.width)
                 .height(data.swapchain_extent.height)
                 .layers(1);
-           FrameBuffer::create(
-                device.create_framebuffer(&create_info, None).expect("Failed to create framebuffer."))
+            FrameBuffer::create(
+                device
+                    .create_framebuffer(&create_info, None)
+                    .expect("Failed to create framebuffer."),
+            )
         })
         .collect();
 
@@ -1355,7 +1428,9 @@ unsafe fn create_command_pool(
         .flags(vk::CommandPoolCreateFlags::TRANSIENT)
         .queue_family_index(indices.graphics);
 
-    Ok(CommandPool::create(device.create_command_pool(&info, None)?))
+    Ok(CommandPool::create(
+        device.create_command_pool(&info, None)?,
+    ))
 }
 
 //================================================
@@ -1433,9 +1508,10 @@ unsafe fn create_depth_objects(
 }
 
 unsafe fn get_depth_format(
-    instance: &Instance, 
+    instance: &Instance,
     physical: &vk::PhysicalDevice,
-    data: &GraphicsDeviceData) -> Result<vk::Format> {
+    data: &GraphicsDeviceData,
+) -> Result<vk::Format> {
     let candidates = &[
         vk::Format::D32_SFLOAT,
         vk::Format::D32_SFLOAT_S8_UINT,
@@ -1464,8 +1540,7 @@ unsafe fn get_supported_format(
         .iter()
         .cloned()
         .find(|f| {
-            let properties =
-                instance.get_physical_device_format_properties(*physical, *f);
+            let properties = instance.get_physical_device_format_properties(*physical, *f);
             match tiling {
                 vk::ImageTiling::LINEAR => properties.linear_tiling_features.contains(features),
                 vk::ImageTiling::OPTIMAL => properties.optimal_tiling_features.contains(features),
@@ -1754,7 +1829,6 @@ unsafe fn create_texture_sampler(device: &Device, data: &mut GraphicsDeviceData)
 }
 
 fn load_model(data: &mut GraphicsDeviceData) -> Result<()> {
-
     // create the reader to use
     let mut reader = BufReader::new(File::open(
         "/Users/prime/depot/github/deimos/resources/viking_room.obj",
@@ -1897,7 +1971,6 @@ unsafe fn create_uniform_buffers(
     device: &Device,
     data: &mut GraphicsDeviceData,
 ) -> Result<()> {
-
     // clear buffers
     data.uniform_buffers.clear();
 
@@ -2000,7 +2073,8 @@ unsafe fn create_command_buffers(device: &Device, data: &mut GraphicsDeviceData)
             .command_buffer_count(1);
 
         let command_buffer = device.allocate_command_buffers(&allocate_info)?[0];
-        data.primary_command_buffers.push(CommandBuffer::create(command_buffer));
+        data.primary_command_buffers
+            .push(CommandBuffer::new(command_buffer));
     }
 
     data.secondary_command_buffers = vec![vec![]; data.swapchain_images.len()];
@@ -2088,8 +2162,7 @@ impl SwapchainSupport {
         Ok(Self {
             capabilities: instance
                 .get_physical_device_surface_capabilities_khr(physical_device, *surface)?,
-            formats: instance
-                .get_physical_device_surface_formats_khr(physical_device, *surface)?,
+            formats: instance.get_physical_device_surface_formats_khr(physical_device, *surface)?,
             present_modes: instance
                 .get_physical_device_surface_present_modes_khr(physical_device, *surface)?,
         })
@@ -2106,7 +2179,12 @@ unsafe fn copy_buffer(
     let command_buffer = begin_single_time_commands(device, data)?;
 
     let regions = vk::BufferCopy::builder().size(size);
-    device.cmd_copy_buffer(command_buffer.buffer, source.buffer, destination.buffer, &[regions]);
+    device.cmd_copy_buffer(
+        command_buffer.buffer,
+        source.buffer,
+        destination.buffer,
+        &[regions],
+    );
 
     end_single_time_commands(device, data, command_buffer)?;
 
@@ -2309,7 +2387,7 @@ unsafe fn begin_single_time_commands(
 
     device.begin_command_buffer(command_buffer, &info)?;
 
-    Ok(CommandBuffer::create(command_buffer))
+    Ok(CommandBuffer::new(command_buffer))
 }
 
 unsafe fn end_single_time_commands(

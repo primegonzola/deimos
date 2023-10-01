@@ -18,7 +18,7 @@ pub struct CommandBuffer {
 }
 
 impl CommandBuffer {
-    pub fn create(buffer: vk::CommandBuffer) -> Self {
+    pub fn new(buffer: vk::CommandBuffer) -> Self {
         Self { buffer }
     }
 
@@ -31,7 +31,7 @@ impl CommandBuffer {
 impl Default for CommandBuffer {
     #[inline]
     fn default() -> Self {
-        CommandBuffer::create(vk::CommandBuffer::null())
+        CommandBuffer::new(vk::CommandBuffer::null())
     }
 }
 

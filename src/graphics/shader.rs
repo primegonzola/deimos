@@ -6,9 +6,11 @@
     clippy::unnecessary_wraps
 )]
 
+use anyhow::Result;
 use std::fmt;
 use std::hash::Hash;
 
+use vulkanalia::bytecode::Bytecode;
 use vulkanalia::prelude::v1_0::*;
 
 // #[repr(transparent)]
@@ -18,8 +20,21 @@ pub struct Shader {
 }
 
 impl Shader {
-    pub fn create(module: vk::ShaderModule) -> Self {
+    pub fn new(module: vk::ShaderModule) -> Self {
         Self { module }
+    }
+
+    pub unsafe fn create(device: &Device, code: &[u8]) -> Result<Shader> {
+        // get bytes
+        let bytes = Bytecode::new(code).unwrap();
+
+        // create info
+        let info = vk::ShaderModuleCreateInfo::builder()
+            .code_size(bytes.code_size())
+            .code(bytes.code());
+
+        // create new shader
+        Ok(Shader::new(device.create_shader_module(&info, None)?))
     }
 
     pub unsafe fn destroy(&self, device: &Device) {
@@ -31,7 +46,7 @@ impl Shader {
 impl Default for Shader {
     #[inline]
     fn default() -> Self {
-        Shader::create(vk::ShaderModule::null())
+        Shader::new(vk::ShaderModule::null())
     }
 }
 
