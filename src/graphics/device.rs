@@ -458,42 +458,45 @@ impl Device {
         &mut self,
         command_buffer: vulkano::command_buffer::PrimaryAutoCommandBuffer,
     ) -> Result<()> {
-        // get the future frame info
-        let future = self
-            .previous_frame_end
-            .take()
-            .unwrap()
-            .join(self.acquire_future.take().unwrap())
-            .then_execute(self.queue.clone(), command_buffer)
-            .unwrap()
-            // The color output is now expected to contain our triangle. But in order to
-            // show it on the screen, we have to *present* the image by calling
-            // `then_swapchain_present`.
-            //
-            // This function does not actually present the image immediately. Instead it
-            // submits a present command at the end of the queue. This means that it will
-            // only be presented once the GPU has finished executing the command buffer
-            // that draws the triangle.
-            .then_swapchain_present(
-                self.queue.clone(),
-                vulkano::swapchain::SwapchainPresentInfo::swapchain_image_index(
-                    self.swapchain.clone(),
-                    self.image_index,
-                ),
-            )
-            .then_signal_fence_and_flush();
+        // check if valid
+        if (!self.acquire_future.is_none()) {
+            // get the future frame info
+            let future = self
+                .previous_frame_end
+                .take()
+                .unwrap()
+                .join(self.acquire_future.take().unwrap())
+                .then_execute(self.queue.clone(), command_buffer)
+                .unwrap()
+                // The color output is now expected to contain our triangle. But in order to
+                // show it on the screen, we have to *present* the image by calling
+                // `then_swapchain_present`.
+                //
+                // This function does not actually present the image immediately. Instead it
+                // submits a present command at the end of the queue. This means that it will
+                // only be presented once the GPU has finished executing the command buffer
+                // that draws the triangle.
+                .then_swapchain_present(
+                    self.queue.clone(),
+                    vulkano::swapchain::SwapchainPresentInfo::swapchain_image_index(
+                        self.swapchain.clone(),
+                        self.image_index,
+                    ),
+                )
+                .then_signal_fence_and_flush();
 
-        match future {
-            Ok(future) => {
-                self.previous_frame_end = Some(future.boxed());
-            }
-            Err(vulkano::sync::FlushError::OutOfDate) => {
-                self.recreate_swapchain = true;
-                self.previous_frame_end = Some(vulkano::sync::now(self.device.clone()).boxed());
-            }
-            Err(e) => {
-                panic!("failed to flush future: {e}");
-                // previous_frame_end = Some(sync::now(device.clone()).boxed());
+            match future {
+                Ok(future) => {
+                    self.previous_frame_end = Some(future.boxed());
+                }
+                Err(vulkano::sync::FlushError::OutOfDate) => {
+                    self.recreate_swapchain = true;
+                    self.previous_frame_end = Some(vulkano::sync::now(self.device.clone()).boxed());
+                }
+                Err(e) => {
+                    panic!("failed to flush future: {e}");
+                    // previous_frame_end = Some(sync::now(device.clone()).boxed());
+                }
             }
         }
 
