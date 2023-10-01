@@ -2,10 +2,6 @@
 
 #![allow(
     dead_code,
-    unused_variables,
-    clippy::manual_slice_size_calculation,
-    clippy::too_many_arguments,
-    clippy::unnecessary_wraps
 )]
 
 use anyhow::Result;
@@ -19,7 +15,7 @@ pub struct App {
 
 impl App {
     /// Creates the app.
-    pub unsafe fn create(window: &Window) -> Result<Self> {
+    pub unsafe fn create(_window: &Window) -> Result<Self> {
         // init data
         let data = AppData::default();
 
@@ -28,13 +24,12 @@ impl App {
     }
 
     /// update s a frame for the app.
-    pub unsafe fn update(&mut self, window: &Window) -> Result<()> {
+    pub unsafe fn update(&mut self, _window: &Window) -> Result<()> {
         // all went fine
         Ok(())
     }
 
     /// Destroys the app.
-    #[rustfmt::skip]
     pub unsafe fn destroy(&self) {
         // destroy any app data
     }
