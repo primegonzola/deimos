@@ -2,6 +2,7 @@
 
 // #![allow(dead_code)]
 
+// use std::sync::Arc;
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
@@ -24,7 +25,6 @@ fn main() {
     let mut graphics =
         graphics::Device::create(&event_loop).expect("failed to create graphics device");
 
-        
     // create vertices
     let vertices = [
         VertexPosition {
@@ -71,8 +71,6 @@ fn main() {
                 graphics
                     .begin_frame()
                     .expect("failed to begin graphics frame");
-
-
 
                 //
                 // In order to draw, we have to build a *command buffer*. The command buffer object
