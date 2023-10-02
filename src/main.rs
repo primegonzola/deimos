@@ -66,7 +66,7 @@ fn main() {
                 event: WindowEvent::Resized(_),
                 ..
             } => {
-                graphics.recreate_swapchain = true;
+                graphics.data.lock().unwrap().recreate_swapchain = true;
             }
             Event::RedrawEventsCleared => {
                 //
