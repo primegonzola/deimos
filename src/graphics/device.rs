@@ -2,7 +2,7 @@
 
 // #![allow(dead_code)]
 use anyhow::Result;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use vulkano::image::ImageAccess;
 use vulkano::sync::GpuFuture;
 use vulkano_win::VkSurfaceBuild;
@@ -31,6 +31,7 @@ pub struct Device {
     pub memory_allocator: vulkano::memory::allocator::StandardMemoryAllocator,
     pub command_buffer_allocator:
         vulkano::command_buffer::allocator::StandardCommandBufferAllocator,
+    pub data: Arc<Mutex<DeviceData>>,
 }
 
 impl Device {
@@ -378,6 +379,9 @@ impl Device {
             acquire_future: None,
             memory_allocator: memory_allocator,
             command_buffer_allocator: command_buffer_allocator,
+            data: Arc::new(Mutex::new(DeviceData {
+                recreate_swapchain: false,
+            })),
         })
     }
 
@@ -582,4 +586,8 @@ fn window_size_dependent_setup(
             })
             .collect::<Vec<_>>(),
     )
+}
+
+pub struct DeviceData {
+    pub recreate_swapchain: bool,
 }
