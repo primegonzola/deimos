@@ -82,8 +82,7 @@ impl Pipeline {
             .vertex_input_state(VertexPosition::per_vertex())
             // The content of the vertex buffer describes a list of triangles.
             .input_assembly_state(vulkano::pipeline::graphics::input_assembly::InputAssemblyState::new())
-            // A Vulkan shader can in theory contain multiple entry points, so we have to specify
-            // which one.
+            // A shader can in theory contain multiple entry points, so we have to specify which one.
             .vertex_shader(vs.entry_point("main").unwrap(), ())
             // Use a resizable viewport set to draw over the entire window
             .viewport_state(vulkano::pipeline::graphics::viewport::ViewportState::viewport_dynamic_scissor_irrelevant())
