@@ -225,6 +225,8 @@ impl Device {
                     .unwrap()[0]
                     .0,
             );
+
+            // get the underlying window
             let window = surface.object().unwrap().downcast_ref::<Window>().unwrap();
 
             // Please take a look at the docs for the meaning of the parameters we didn't mention.
