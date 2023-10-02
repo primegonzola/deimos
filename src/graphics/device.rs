@@ -25,6 +25,7 @@ pub struct Device {
     pub render_pass: Arc<vulkano::render_pass::RenderPass>,
     pub viewport: vulkano::pipeline::graphics::viewport::Viewport,
     pub previous_frame_end: Option<Box<dyn vulkano::sync::GpuFuture>>,
+    pub recreate_swapchain: bool,
     pub suboptimal: bool,
     pub acquire_future: Option<vulkano::swapchain::SwapchainAcquireFuture>,
     pub memory_allocator: vulkano::memory::allocator::StandardMemoryAllocator,
@@ -374,13 +375,14 @@ impl Device {
             framebuffers: framebuffers,
             render_pass: render_pass.clone(),
             viewport: viewport,
+            recreate_swapchain: recreate_swapchain,
             previous_frame_end: previous_frame_end,
             suboptimal: false,
             acquire_future: None,
             memory_allocator: memory_allocator,
             command_buffer_allocator: command_buffer_allocator,
             data: Arc::new(Mutex::new(DeviceData {
-                recreate_swapchain: recreate_swapchain,
+                // recreate_swapchain: recreate_swapchain,
             })),
         })
     }
@@ -414,12 +416,12 @@ impl Device {
         self.previous_frame_end.as_mut().unwrap().cleanup_finished();
 
         // get lock to the data
-        let mut data = self.data.lock().unwrap();
+        // let mut data = self.data.lock().unwrap();
 
         // Whenever the window resizes we need to recreate everything dependent on the
         // window size. In this example that includes the swapchain, the framebuffers and
         // the dynamic state viewport.
-        if data.recreate_swapchain {
+        if self.recreate_swapchain {
             // Use the new dimensions of the window.
 
             let (new_swapchain, new_swapchain_images) =
@@ -452,7 +454,7 @@ impl Device {
             );
 
             // swapchain has been recreated.
-            data.recreate_swapchain = false;
+            self.recreate_swapchain = false;
         }
 
         //
@@ -468,7 +470,7 @@ impl Device {
             match vulkano::swapchain::acquire_next_image(self.swapchain.clone(), None) {
                 Ok(r) => r,
                 Err(vulkano::swapchain::AcquireError::OutOfDate) => {
-                    self.data.lock().unwrap().recreate_swapchain = true;
+                    self.recreate_swapchain = true;
                     return Ok(());
                 }
                 Err(e) => panic!("failed to acquire next image: {e}"),
@@ -489,7 +491,7 @@ impl Device {
             //
             // force recreation of swapchain
             //
-            data.recreate_swapchain = true;
+            self.recreate_swapchain = true;
         }
 
         // all went fine
@@ -537,7 +539,7 @@ impl Device {
                     self.previous_frame_end = Some(future.boxed());
                 }
                 Err(vulkano::sync::FlushError::OutOfDate) => {
-                    self.data.lock().unwrap().recreate_swapchain = true;
+                    self.recreate_swapchain = true;
                     self.previous_frame_end = Some(vulkano::sync::now(self.device.clone()).boxed());
                 }
                 Err(e) => {
@@ -588,5 +590,5 @@ fn window_size_dependent_setup(
 }
 
 pub struct DeviceData {
-    pub recreate_swapchain: bool,
+    // pub recreate_swapchain: bool,
 }
