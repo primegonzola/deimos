@@ -3,8 +3,7 @@
 // #![allow(dead_code)]
 
 use vulkano::command_buffer::{
-    allocator::StandardCommandBufferAllocator, AutoCommandBufferBuilder, CommandBufferUsage,
-    RenderPassBeginInfo, SubpassContents,
+    AutoCommandBufferBuilder, CommandBufferUsage, RenderPassBeginInfo, SubpassContents,
 };
 use winit::{
     event::{Event, WindowEvent},
@@ -15,6 +14,7 @@ use winit::{
 mod graphics;
 
 use graphics::Buffer;
+use graphics::Color;
 use graphics::Pipeline;
 use graphics::VertexPosition;
 
@@ -92,6 +92,7 @@ fn main() {
                 builder
                     // Before we can draw, we have to *enter a render pass*.
                     .begin_render_pass(
+                        
                         RenderPassBeginInfo {
                             // A list of values to clear the attachments with. This list contains
                             // one item for each attachment in the render pass. In this case, there
@@ -99,7 +100,7 @@ fn main() {
                             //
                             // Only attachments that have `LoadOp::Clear` are provided with clear
                             // values, any others should use `ClearValue::None` as the clear value.
-                            clear_values: vec![Some([0.0, 1.0, 1.0, 1.0].into())],
+                            clear_values: vec![Some(Color::blue().to_rgba().into())],
 
                             ..RenderPassBeginInfo::framebuffer(
                                 graphics.framebuffers[graphics.image_index as usize].clone(),
@@ -119,11 +120,15 @@ fn main() {
                     .set_viewport(0, [graphics.viewport.clone()])
                     .bind_pipeline_graphics(pipeline.handle.clone())
                     .bind_vertex_buffers(0, vertex_buffer.clone())
+                    //
                     // We add a draw command.
+                    //
                     .draw(vertex_buffer.len() as u32, 1, 0, 0)
                     .unwrap()
+                    //
                     // We leave the render pass. Note that if we had multiple subpasses we could
                     // have called `next_subpass` to jump to the next subpass.
+                    //
                     .end_render_pass()
                     .unwrap();
 
