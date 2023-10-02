@@ -6,8 +6,10 @@ use super::device::Device;
 use super::{Buffer, Color, Pipeline, Viewport};
 use anyhow::Result;
 use std::cell::RefCell;
+use std::sync::Arc;
 
 pub struct CommandBuffer {
+    pub handle: Option<vulkano::command_buffer::PrimaryAutoCommandBuffer>,
     builder: RefCell<
         vulkano::command_buffer::AutoCommandBufferBuilder<
             vulkano::command_buffer::PrimaryAutoCommandBuffer,
@@ -16,7 +18,11 @@ pub struct CommandBuffer {
 }
 
 impl CommandBuffer {
-    pub fn create(graphics: &Device) -> Result<CommandBuffer> {
+    pub fn begin(
+        graphics: &Device,
+        color: Option<Color>,
+        depth: Option<f32>,
+    ) -> Result<CommandBuffer> {
         // create the builder
         let builder = RefCell::new(
             vulkano::command_buffer::AutoCommandBufferBuilder::primary(
@@ -69,17 +75,21 @@ impl CommandBuffer {
         // .unwrap();
 
         // all done
-        Ok(Self { builder: builder })
+        Ok(Self {
+            handle: None,
+            builder: builder,
+        })
     }
 
-    pub fn set_viewport(&self, graphics: &Device, viewport:Viewport) -> Result<()> {
-        self.builder
-            .borrow_mut()
-            .set_viewport(0, [vulkano::pipeline::graphics::viewport::Viewport {
+    pub fn set_viewport(&self, viewport: Viewport) -> Result<()> {
+        self.builder.borrow_mut().set_viewport(
+            0,
+            [vulkano::pipeline::graphics::viewport::Viewport {
                 origin: viewport.origin.clone(),
                 dimensions: viewport.dimensions.clone(),
                 depth_range: viewport.depth_range.clone(),
-            }]);
+            }],
+        );
         Ok(())
     }
 
@@ -94,6 +104,10 @@ impl CommandBuffer {
         self.builder
             .borrow_mut()
             .bind_vertex_buffers(0, vertex_buffer.handle.clone());
+        Ok(())
+    }
+
+    pub fn end(&mut self, graphics: &Device) -> Result<()> {
         Ok(())
     }
 }

@@ -12,10 +12,10 @@ use winit::{
 mod graphics;
 mod rendering;
 
-use graphics::Buffer;
 use graphics::Color;
 use graphics::Pipeline;
 use graphics::VertexPosition;
+use graphics::{Buffer, CommandBuffer};
 
 fn main() {
     // create an event loop
@@ -76,6 +76,14 @@ fn main() {
                     .begin_frame()
                     .expect("failed to begin graphics frame");
 
+                // // create command buffer
+                // let mut command_buffer =
+                //     CommandBuffer::begin(&graphics, Some(Color::red()), Some(1.0)).unwrap();
+
+
+
+                // // complete 
+                // command_buffer.end(&graphics).unwrap();
                 //
                 // In order to draw, we have to build a *command buffer*. The command buffer object
                 // holds the list of commands that are going to be executed.
@@ -137,8 +145,10 @@ fn main() {
                     .unwrap();
 
                 // Finish building the command buffer by calling `build`.
-                let command_buffer: vulkano::command_buffer::PrimaryAutoCommandBuffer = builder.build().unwrap();
+                let command_buffer: vulkano::command_buffer::PrimaryAutoCommandBuffer =
+                    builder.build().unwrap();
 
+                
                 //
                 // end graphics frame
                 //

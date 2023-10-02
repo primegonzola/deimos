@@ -12,6 +12,8 @@ use winit::{
     window::{Window, WindowBuilder},
 };
 
+use super::CommandBuffer;
+
 pub struct Device {
     pub device: Arc<vulkano::device::Device>,
     pub instance: Arc<vulkano::instance::Instance>,
