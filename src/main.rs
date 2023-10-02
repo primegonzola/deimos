@@ -25,6 +25,8 @@ fn main() {
     let mut graphics =
         graphics::Device::create(&event_loop).expect("failed to create graphics device");
 
+    // check https://stackoverflow.com/questions/68547268/cannot-borrow-data-in-an-arc-as-mutable
+
     // create vertices
     let vertices = [
         VertexPosition {
