@@ -45,7 +45,7 @@ impl CommandBuffer {
                     //
                     // Only attachments that have `LoadOp::Clear` are provided with clear
                     // values, any others should use `ClearValue::None` as the clear value.
-                    clear_values: vec![Some(Color::blue().to_rgba().into())],
+                    clear_values: vec![Some(color.unwrap().to_rgba().into())],
 
                     ..vulkano::command_buffer::RenderPassBeginInfo::framebuffer(
                         graphics.framebuffers[graphics.image_index as usize].clone(),
