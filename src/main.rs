@@ -123,7 +123,7 @@ fn main() {
                     // TODO: Document state setting and how it affects subsequent draw commands.
                     .set_viewport(0, [graphics.viewport.clone()])
                     .bind_pipeline_graphics(pipeline.handle.clone())
-                    .bind_vertex_buffers(0, vertex_buffer.clone())
+                    .bind_vertex_buffers(0, vertex_buffer.handle.clone())
                     //
                     // We add a draw command.
                     //
@@ -137,7 +137,7 @@ fn main() {
                     .unwrap();
 
                 // Finish building the command buffer by calling `build`.
-                let command_buffer = builder.build().unwrap();
+                let command_buffer: vulkano::command_buffer::PrimaryAutoCommandBuffer = builder.build().unwrap();
 
                 //
                 // end graphics frame

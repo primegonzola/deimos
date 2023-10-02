@@ -1,24 +1,26 @@
 use anyhow::Result;
-use std::sync::Arc;
+use cgmath::num_traits::ToPrimitive;
+use std::{borrow::BorrowMut, sync::Arc};
 
 use super::device::Device;
 
-pub struct Buffer {
-    _handle: Arc<vulkano::buffer::Buffer>,
+pub struct Buffer<T> {
+    pub handle: vulkano::buffer::Subbuffer<[T]>,
 }
 
-impl Buffer {
-    pub fn from_iter<T, I>(
+impl<T> Buffer<T> {
+    pub fn from_iter<S>(
         device: &Device,
         usage: vulkano::buffer::BufferUsage,
-        iter: I,
-    ) -> Result<vulkano::buffer::Subbuffer<[T]>>
+        iter: S,
+    ) -> Result<Buffer<T>>
     where
         T: vulkano::buffer::BufferContents,
-        I: IntoIterator<Item = T>,
-        I::IntoIter: ExactSizeIterator,
+        S: IntoIterator<Item = T>,
+        S::IntoIter: ExactSizeIterator,
     {
-        Ok(vulkano::buffer::Buffer::from_iter(
+        // create native
+        let handle = vulkano::buffer::Buffer::from_iter(
             &device.memory_allocator,
             vulkano::buffer::BufferCreateInfo {
                 usage: usage,
@@ -30,6 +32,15 @@ impl Buffer {
             },
             iter,
         )
-        .unwrap())
+        .unwrap();
+
+        Ok(Self {
+            handle: handle,
+        })
+    }
+
+    pub fn len(&self) -> usize {
+        // delegate to the handle
+        self.handle.len().to_usize().unwrap()
     }
 }
