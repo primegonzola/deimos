@@ -28,6 +28,9 @@ pub struct Device {
     pub previous_frame_end: Option<Box<dyn vulkano::sync::GpuFuture>>,
     pub suboptimal: bool,
     pub acquire_future: Option<vulkano::swapchain::SwapchainAcquireFuture>,
+    pub memory_allocator: vulkano::memory::allocator::StandardMemoryAllocator,
+    pub command_buffer_allocator:
+        vulkano::command_buffer::allocator::StandardCommandBufferAllocator,
 }
 
 impl Device {
@@ -320,6 +323,42 @@ impl Device {
         let (viewport, framebuffers) =
             window_size_dependent_setup(&images, render_pass.clone(), &viewport);
 
+        //
+        // In some situations, the swapchain will become invalid by itself. This includes for example
+        // when the window is resized (as the images of the swapchain will no longer match the
+        // window's) or, on Android, when the application went to the background and goes back to the
+        // foreground.
+        //
+        // In this situation, acquiring a swapchain image or presenting it will return an error.
+        // Rendering to an image of that swapchain will not produce any error, but may or may not work.
+        // To continue rendering, we need to recreate the swapchain by creating a new swapchain. Here,
+        // we remember that we need to do this for the next loop iteration.
+        //
+        let recreate_swapchain = false;
+
+        //
+        // In the loop below we are going to submit commands to the GPU. Submitting a command produces
+        // an object that implements the `GpuFuture` trait, which holds the resources for as long as
+        // they are in use by the GPU.
+        //
+        // Destroying the `GpuFuture` blocks until the GPU is finished executing it. In order to avoid
+        // that, we store the submission of the previous frame here.
+        //
+        let previous_frame_end = Some(vulkano::sync::future::now(device.clone()).boxed());
+
+        // create memory allocator for the device
+        let memory_allocator =
+            vulkano::memory::allocator::StandardMemoryAllocator::new_default(device.clone());
+
+        // Before we can start creating and recording command buffers, we need a way of allocating
+        // them. Vulkano provides a command buffer allocator, which manages raw Vulkan command pools
+        // underneath and provides a safe interface for them.
+        let command_buffer_allocator =
+            vulkano::command_buffer::allocator::StandardCommandBufferAllocator::new(
+                device.clone(),
+                Default::default(),
+            );
+
         // all finaly done
         Ok(Self {
             device: device.clone(),
@@ -330,13 +369,15 @@ impl Device {
             swapchain: swapchain.clone(),
             swapchain_images: images,
             image_index: 0,
-            recreate_swapchain: false,
+            recreate_swapchain: recreate_swapchain,
             framebuffers: framebuffers,
             render_pass: render_pass.clone(),
             viewport: viewport,
-            previous_frame_end: Some(vulkano::sync::future::now(device.clone()).boxed()),
+            previous_frame_end: previous_frame_end,
             suboptimal: false,
             acquire_future: None,
+            memory_allocator: memory_allocator,
+            command_buffer_allocator: command_buffer_allocator,
         })
     }
 
