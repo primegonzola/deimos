@@ -2,9 +2,6 @@
 
 // #![allow(dead_code)]
 
-use vulkano::command_buffer::{
-    AutoCommandBufferBuilder, CommandBufferUsage, RenderPassBeginInfo, SubpassContents,
-};
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
@@ -12,6 +9,7 @@ use winit::{
 
 // include the modules in the code graph
 mod graphics;
+mod rendering;
 
 use graphics::Buffer;
 use graphics::Color;
@@ -26,6 +24,7 @@ fn main() {
     let mut graphics =
         graphics::Device::create(&event_loop).expect("failed to create graphics device");
 
+        
     // create vertices
     let vertices = [
         VertexPosition {
@@ -47,12 +46,10 @@ fn main() {
     )
     .unwrap();
 
-    // Before we draw we have to create what is called a pipeline
+    // let's create a standard pipeline
     let pipeline = Pipeline::create_standard_pipeline(&graphics).unwrap();
 
-    //
     // process the event loop
-    //
     event_loop.run(move |event, _, control_flow| {
         match event {
             Event::WindowEvent {
@@ -68,8 +65,14 @@ fn main() {
                 graphics.recreate_swapchain = true;
             }
             Event::RedrawEventsCleared => {
-                // begin frame
-                graphics.begin().expect("failed to begin graphics");
+                //
+                // begin graphics frame
+                //
+                graphics
+                    .begin_frame()
+                    .expect("failed to begin graphics frame");
+
+
 
                 //
                 // In order to draw, we have to build a *command buffer*. The command buffer object
@@ -82,18 +85,17 @@ fn main() {
                 // Note that we have to pass a queue family when we create the command buffer. The
                 // command buffer will only be executable on that given queue family.
                 //
-                let mut builder = AutoCommandBufferBuilder::primary(
+                let mut builder = vulkano::command_buffer::AutoCommandBufferBuilder::primary(
                     &graphics.command_buffer_allocator,
                     graphics.queue.queue_family_index(),
-                    CommandBufferUsage::OneTimeSubmit,
+                    vulkano::command_buffer::CommandBufferUsage::OneTimeSubmit,
                 )
                 .unwrap();
 
                 builder
                     // Before we can draw, we have to *enter a render pass*.
                     .begin_render_pass(
-                        
-                        RenderPassBeginInfo {
+                        vulkano::command_buffer::RenderPassBeginInfo {
                             // A list of values to clear the attachments with. This list contains
                             // one item for each attachment in the render pass. In this case, there
                             // is only one attachment, and we clear it with a blue color.
@@ -102,7 +104,7 @@ fn main() {
                             // values, any others should use `ClearValue::None` as the clear value.
                             clear_values: vec![Some(Color::blue().to_rgba().into())],
 
-                            ..RenderPassBeginInfo::framebuffer(
+                            ..vulkano::command_buffer::RenderPassBeginInfo::framebuffer(
                                 graphics.framebuffers[graphics.image_index as usize].clone(),
                             )
                         },
@@ -111,7 +113,7 @@ fn main() {
                         // `Inline` or `SecondaryCommandBuffers`. The latter is a bit more advanced
                         // and is not covered here.
                         //
-                        SubpassContents::Inline,
+                        vulkano::command_buffer::SubpassContents::Inline,
                     )
                     .unwrap()
                     // We are now inside the first subpass of the render pass.
@@ -135,10 +137,12 @@ fn main() {
                 // Finish building the command buffer by calling `build`.
                 let command_buffer = builder.build().unwrap();
 
-                // end graphics
+                //
+                // end graphics frame
+                //
                 graphics
-                    .end(command_buffer)
-                    .expect("failed to end graphics");
+                    .end_frame(command_buffer)
+                    .expect("failed to end graphics frame");
             }
             _ => (),
         }

@@ -395,7 +395,7 @@ impl Device {
         self.dimensions().width == 0 || self.dimensions().height == 0
     }
 
-    pub fn begin(&mut self) -> Result<()> {
+    pub fn begin_frame(&mut self) -> Result<()> {
         //
         // check if minized
         //
@@ -493,7 +493,12 @@ impl Device {
         Ok(())
     }
 
-    pub fn end(
+    pub fn _render(&self) -> Result<()> {
+        // all went fine
+        Ok(())
+    }
+
+    pub fn end_frame(
         &mut self,
         command_buffer: vulkano::command_buffer::PrimaryAutoCommandBuffer,
     ) -> Result<()> {

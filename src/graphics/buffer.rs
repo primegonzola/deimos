@@ -4,7 +4,7 @@ use std::sync::Arc;
 use super::device::Device;
 
 pub struct Buffer {
-    handle: Arc<vulkano::buffer::Buffer>,
+    _handle: Arc<vulkano::buffer::Buffer>,
 }
 
 impl Buffer {
