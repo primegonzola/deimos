@@ -411,10 +411,13 @@ impl Device {
         // has already processed, and frees the resources that are no longer needed.
         self.previous_frame_end.as_mut().unwrap().cleanup_finished();
 
+        // get lock to the data
+        let mut data = self.data.lock().unwrap();
+
         // Whenever the window resizes we need to recreate everything dependent on the
         // window size. In this example that includes the swapchain, the framebuffers and
         // the dynamic state viewport.
-        if self.data.lock().unwrap().recreate_swapchain {
+        if data.recreate_swapchain {
             // Use the new dimensions of the window.
 
             let (new_swapchain, new_swapchain_images) =
@@ -447,7 +450,7 @@ impl Device {
             );
 
             // swapchain has been recreated.
-            self.data.lock().unwrap().recreate_swapchain = false;
+            data.recreate_swapchain = false;
         }
 
         //
@@ -484,7 +487,7 @@ impl Device {
             //
             // force recreation of swapchain
             //
-            self.data.lock().unwrap().recreate_swapchain = true;
+            data.recreate_swapchain = true;
         }
 
         // all went fine
