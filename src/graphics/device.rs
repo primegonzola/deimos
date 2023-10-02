@@ -205,7 +205,7 @@ impl Device {
         // swapchain allocates the color buffers that will contain the image that will ultimately be
         // visible on the screen. These images are returned alongside the swapchain.
         //
-        let (swapchain, images) = {
+        let (swapchain, swapchain_images) = {
             //
             // Querying the capabilities of the surface. When we create the swapchain we can only pass
             // values that are allowed by the capabilities.
@@ -321,7 +321,7 @@ impl Device {
         // Since we need to draw to multiple images, we are going to create a different framebuffer for
         // each image.
         let (viewport, framebuffers) =
-            window_size_dependent_setup(&images, render_pass.clone(), &viewport);
+            window_size_dependent_setup(&swapchain_images, render_pass.clone(), &viewport);
 
         //
         // In some situations, the swapchain will become invalid by itself. This includes for example
@@ -367,7 +367,7 @@ impl Device {
             queue: queue.clone(),
             surface: surface.clone(),
             swapchain: swapchain.clone(),
-            swapchain_images: images,
+            swapchain_images: swapchain_images,
             image_index: 0,
             framebuffers: framebuffers,
             render_pass: render_pass.clone(),
@@ -405,23 +405,19 @@ impl Device {
             return Ok(());
         }
 
-        //
         // It is important to call this function from time to time, otherwise resources
         // will keep accumulating and you will eventually reach an out of memory error.
         // Calling this function polls various fences in order to determine what the GPU
         // has already processed, and frees the resources that are no longer needed.
-        //
         self.previous_frame_end.as_mut().unwrap().cleanup_finished();
 
-        //
         // Whenever the window resizes we need to recreate everything dependent on the
         // window size. In this example that includes the swapchain, the framebuffers and
         // the dynamic state viewport.
-        //
         if self.data.lock().unwrap().recreate_swapchain {
             // Use the new dimensions of the window.
 
-            let (new_swapchain, new_images) =
+            let (new_swapchain, new_swapchain_images) =
                 match self
                     .swapchain
                     .recreate(vulkano::swapchain::SwapchainCreateInfo {
@@ -429,11 +425,9 @@ impl Device {
                         ..self.swapchain.create_info()
                     }) {
                     Ok(r) => r,
-                    //
                     // This error tends to happen when the user is manually resizing the
                     // window. Simply restarting the loop is the easiest way to fix this
                     // issue.
-                    //
                     Err(vulkano::swapchain::SwapchainCreationError::ImageExtentNotSupported {
                         ..
                     }) => return Ok(()),
@@ -442,13 +436,15 @@ impl Device {
 
             // save new swapchain
             self.swapchain = new_swapchain;
+            self.swapchain_images = new_swapchain_images;
 
-            //
             // Because framebuffers contains a reference to the old swapchain, we need to
             // recreate framebuffers as well.
-            //
-            (self.viewport, self.framebuffers) =
-                window_size_dependent_setup(&new_images, self.render_pass.clone(), &self.viewport);
+            (self.viewport, self.framebuffers) = window_size_dependent_setup(
+                &self.swapchain_images,
+                self.render_pass.clone(),
+                &self.viewport,
+            );
 
             // swapchain has been recreated.
             self.data.lock().unwrap().recreate_swapchain = false;
