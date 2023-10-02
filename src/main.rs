@@ -77,12 +77,15 @@ fn main() {
                     .expect("failed to begin graphics frame");
 
                 // // create command buffer
-                // let mut command_buffer =
-                //     CommandBuffer::begin(&graphics, Some(Color::red()), Some(1.0)).unwrap();
+                // let mut command_buffer = CommandBuffer::begin(
+                //     &graphics,
+                //     graphics.framebuffers[graphics.image_index as usize].clone(),
+                //     Some(Color::red()),
+                //     Some(1.0),
+                // )
+                // .unwrap();
 
-
-
-                // // complete 
+                // // complete
                 // command_buffer.end(&graphics).unwrap();
                 //
                 // In order to draw, we have to build a *command buffer*. The command buffer object
@@ -148,7 +151,6 @@ fn main() {
                 let command_buffer: vulkano::command_buffer::PrimaryAutoCommandBuffer =
                     builder.build().unwrap();
 
-                
                 //
                 // end graphics frame
                 //

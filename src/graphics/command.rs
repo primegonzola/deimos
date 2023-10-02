@@ -7,6 +7,8 @@ use super::{Buffer, Color, Pipeline, Viewport};
 use anyhow::Result;
 use std::cell::RefCell;
 use std::sync::Arc;
+use vulkano::pipeline::graphics;
+use vulkano::render_pass::Framebuffer;
 
 pub struct CommandBuffer {
     pub handle: Option<vulkano::command_buffer::PrimaryAutoCommandBuffer>,
@@ -20,6 +22,7 @@ pub struct CommandBuffer {
 impl CommandBuffer {
     pub fn begin(
         graphics: &Device,
+        framebuffer: Arc<vulkano::render_pass::Framebuffer>,
         color: Option<Color>,
         depth: Option<f32>,
     ) -> Result<CommandBuffer> {
@@ -47,9 +50,7 @@ impl CommandBuffer {
                     // values, any others should use `ClearValue::None` as the clear value.
                     clear_values: vec![Some(color.unwrap().to_rgba().into())],
 
-                    ..vulkano::command_buffer::RenderPassBeginInfo::framebuffer(
-                        graphics.framebuffers[graphics.image_index as usize].clone(),
-                    )
+                    ..vulkano::command_buffer::RenderPassBeginInfo::framebuffer(framebuffer.clone())
                 },
                 //
                 // The contents of the first (and only) subpass. This can be either
@@ -107,7 +108,12 @@ impl CommandBuffer {
         Ok(())
     }
 
-    pub fn end(&mut self, graphics: &Device) -> Result<()> {
+    pub fn end(&mut self) -> Result<()> {
+        //
+        // We leave the render pass. Note that if we had multiple subpasses we could
+        // have called `next_subpass` to jump to the next subpass.
+        //
+        self.builder.borrow_mut().end_render_pass().unwrap();
         Ok(())
     }
 }
