@@ -1,6 +1,5 @@
 use anyhow::Result;
 use cgmath::num_traits::ToPrimitive;
-use std::{borrow::BorrowMut, sync::Arc};
 
 use super::device::Device;
 

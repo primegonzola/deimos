@@ -12,8 +12,6 @@ use winit::{
     window::{Window, WindowBuilder},
 };
 
-use super::CommandBuffer;
-
 pub struct Device {
     pub device: Arc<vulkano::device::Device>,
     pub instance: Arc<vulkano::instance::Instance>,
@@ -519,6 +517,7 @@ impl Device {
                 .join(self.acquire_future.take().unwrap())
                 .then_execute(self.queue.clone(), command_buffer)
                 .unwrap()
+                //
                 // The color output is now expected to contain our triangle. But in order to
                 // show it on the screen, we have to *present* the image by calling
                 // `then_swapchain_present`.
