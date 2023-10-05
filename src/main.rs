@@ -15,6 +15,7 @@ use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::WindowBuilder;
 
 mod app;
+mod gfx;
 mod graphics;
 mod rendering;
 
