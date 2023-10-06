@@ -22,10 +22,9 @@ use vulkanalia::vk::ExtDebugUtilsExtension;
 use vulkanalia::vk::KhrSurfaceExtension;
 use vulkanalia::vk::KhrSwapchainExtension;
 
-use super::QueueFamilyIndices;
-use super::SuitabilityError;
-use super::SwapChainSupport;
-use super::{Texture, TextureView};
+use super::{
+    FrameBuffer, QueueFamilyIndices, SuitabilityError, SwapChainSupport, Texture, TextureView,
+};
 
 // Whether the validation layers should be enabled.
 const VALIDATION_ENABLED: bool = cfg!(debug_assertions);
@@ -41,12 +40,29 @@ const PORTABILITY_MACOS_VERSION: Version = Version::new(1, 3, 216);
 // The maximum number of frames that can be processed concurrently.
 const MAX_FRAMES_IN_FLIGHT: usize = 2;
 
+struct DeviceSyncData {
+    textures_available_semaphores: Vec<vk::Semaphore>,
+    render_finished_semaphores: Vec<vk::Semaphore>,
+    in_flight_fences: Vec<vk::Fence>,
+    in_flight_textures: Vec<vk::Fence>,
+}
+
+struct DeviceTargetData {
+    albedo_texture: Texture,
+    albedo_texture_view: TextureView,
+    depth_texture: Texture,
+    depth_texture_view: TextureView,
+}
+
 struct SwapchainData {
     handle: vk::SwapchainKHR,
-    format: vk::Format,
     extent: vk::Extent2D,
+    format: vk::Format,
+    framebuffers: Vec<FrameBuffer>,
+    render_pass: vk::RenderPass,
     textures: Vec<Texture>,
     views: Vec<TextureView>,
+    target: DeviceTargetData,
 }
 
 struct QueueData {
@@ -64,16 +80,7 @@ pub struct Device {
     messenger: Option<vk::DebugUtilsMessengerEXT>,
     swapchain: SwapchainData,
     queue: QueueData,
-    // messenger: vk::DebugUtilsMessengerEXT,
-    // graphics_queue: Queue,
-    // present_queue: Queue,
-    // swapchain: Swapchain,
-    // swapchain_textures: Vec<Texture>,
-    // depth_texture: Texture,
-    // render_pass: RenderPass,
-    // descriptor_set_layout: DescriptorSetLayout,
-    // pipeline_layout: PipelineLayout,
-    // graphics_pipeline: Pipeline,
+    sync: DeviceSyncData,
 }
 
 impl Device {
@@ -91,7 +98,11 @@ impl Device {
                 create_logical_device(&entry, &instance, &surface, &physical)?;
 
             // create the swapchain
-            let swapchain = construct_swapchain(window, &instance, &surface, &physical, &device)?;
+            let swapchain =
+                construct_swapchain(window, &instance, &surface, &physical, &device, &samples)?;
+
+            // create sync objects
+            let sync = create_sync_objects(&device, &swapchain)?;
 
             // init app instance
             Ok(Self {
@@ -107,6 +118,7 @@ impl Device {
                     graphics: graphics_queue,
                     present: present_queue,
                 },
+                sync,
             })
         }
     }
@@ -116,15 +128,22 @@ impl Device {
             // wait until device is idle
             self.device.device_wait_idle().unwrap();
 
-            // destroy swapchain views
-            self.swapchain
-                .views
+            // destroy fences
+            self.sync
+                .in_flight_fences
                 .iter()
-                .for_each(|v| v.destroy(&self.device));
+                .for_each(|f| self.device.destroy_fence(*f, None));
+            self.sync
+                .render_finished_semaphores
+                .iter()
+                .for_each(|s| self.device.destroy_semaphore(*s, None));
+            self.sync
+                .textures_available_semaphores
+                .iter()
+                .for_each(|s| self.device.destroy_semaphore(*s, None));
 
-            // destroy swapchain
-            self.device
-                .destroy_swapchain_khr(self.swapchain.handle, None);
+            // deconstruct swapchain
+            destroy_swapchain(&self.device, &self.swapchain);
 
             // destroy device
             self.device.destroy_device(None);
@@ -164,6 +183,41 @@ extern "system" fn debug_callback(
     }
 
     vk::FALSE
+}
+
+unsafe fn create_sync_objects(
+    device: &vulkanalia::Device,
+    swapchain: &SwapchainData,
+) -> Result<DeviceSyncData> {
+    let semaphore_info = vk::SemaphoreCreateInfo::builder();
+    let fence_info = vk::FenceCreateInfo::builder().flags(vk::FenceCreateFlags::SIGNALED);
+
+    // create sync object
+    let mut data = DeviceSyncData {
+        textures_available_semaphores: vec![],
+        render_finished_semaphores: vec![],
+        in_flight_fences: vec![],
+        in_flight_textures: vec![],
+    };
+
+    for _ in 0..MAX_FRAMES_IN_FLIGHT {
+        data.textures_available_semaphores
+            .push(device.create_semaphore(&semaphore_info, None)?);
+        data.render_finished_semaphores
+            .push(device.create_semaphore(&semaphore_info, None)?);
+
+        data.in_flight_fences
+            .push(device.create_fence(&fence_info, None)?);
+    }
+
+    // get the the inflight texture fences
+    data.in_flight_textures = swapchain
+        .textures
+        .iter()
+        .map(|_| vk::Fence::null())
+        .collect();
+
+    Ok(data)
 }
 
 unsafe fn create_instance(
@@ -393,12 +447,133 @@ unsafe fn create_logical_device(
     Ok((device, graphics_queue, present_queue))
 }
 
+unsafe fn create_texture(
+    instance: &vulkanalia::Instance,
+    physical: &vk::PhysicalDevice,
+    device: &vulkanalia::Device,
+    width: u32,
+    height: u32,
+    mip_levels: u32,
+    samples: vk::SampleCountFlags,
+    format: vk::Format,
+    tiling: vk::ImageTiling,
+    usage: vk::ImageUsageFlags,
+    properties: vk::MemoryPropertyFlags,
+) -> Result<Texture> {
+    // create the image info using specified data
+    let info = vk::ImageCreateInfo::builder()
+        .image_type(vk::ImageType::_2D)
+        .extent(vk::Extent3D {
+            width,
+            height,
+            depth: 1,
+        })
+        .mip_levels(mip_levels)
+        .array_layers(1)
+        .format(format)
+        .tiling(tiling)
+        .initial_layout(vk::ImageLayout::UNDEFINED)
+        .usage(usage)
+        .sharing_mode(vk::SharingMode::EXCLUSIVE)
+        .samples(samples);
+
+    // create the actual image
+    let image = device.create_image(&info, None)?;
+
+    // get the requirements for the image
+    let requirements = device.get_image_memory_requirements(image);
+
+    // create the memory info using the requirements
+    let info = vk::MemoryAllocateInfo::builder()
+        .allocation_size(requirements.size)
+        .memory_type_index(get_memory_type_index(
+            instance,
+            physical,
+            properties,
+            requirements,
+        )?);
+
+    // allocate the memory for the image
+    let memory = device.allocate_memory(&info, None)?;
+
+    // bind the memory to the image
+    device.bind_image_memory(image, memory, 0)?;
+
+    // all done create the texture
+    Ok(Texture::create(image, memory))
+}
+
+unsafe fn create_swapchain_albedo_objects(
+    instance: &vulkanalia::Instance,
+    physical: &vk::PhysicalDevice,
+    device: &vulkanalia::Device,
+    samples: &vk::SampleCountFlags,
+    width: u32,
+    height: u32,
+    format: vk::Format,
+) -> Result<(Texture, TextureView)> {
+    // texture
+    let texture = create_texture(
+        instance,
+        physical,
+        device,
+        width,
+        height,
+        1,
+        *samples,
+        format,
+        vk::ImageTiling::OPTIMAL,
+        vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSIENT_ATTACHMENT,
+        vk::MemoryPropertyFlags::DEVICE_LOCAL,
+    )?;
+
+    // texture view
+    let view = texture.create_view(device, format, vk::ImageAspectFlags::COLOR, 1)?;
+
+    // all went fine
+    Ok((texture, view))
+}
+
+unsafe fn create_swapchain_depth_objects(
+    instance: &vulkanalia::Instance,
+    physical: &vk::PhysicalDevice,
+    device: &vulkanalia::Device,
+    samples: &vk::SampleCountFlags,
+    width: u32,
+    height: u32,
+) -> Result<(Texture, TextureView)> {
+    // get depth format
+    let format = get_depth_format(instance, physical)?;
+
+    // create depth texture
+    let texture = create_texture(
+        instance,
+        physical,
+        device,
+        width,
+        height,
+        1,
+        *samples,
+        format,
+        vk::ImageTiling::OPTIMAL,
+        vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT,
+        vk::MemoryPropertyFlags::DEVICE_LOCAL,
+    )?;
+
+    // depth texture view
+    let view = texture.create_view(device, format, vk::ImageAspectFlags::DEPTH, 1)?;
+
+    // all went fine
+    Ok((texture, view))
+}
+
 unsafe fn construct_swapchain(
     window: &Window,
     instance: &vulkanalia::Instance,
     surface: &vk::SurfaceKHR,
     physical: &vk::PhysicalDevice,
     device: &vulkanalia::Device,
+    samples: &vk::SampleCountFlags,
 ) -> Result<SwapchainData> {
     // create swapchain
     let (swapchain, format, extent) =
@@ -419,14 +594,89 @@ unsafe fn construct_swapchain(
         .map(|i| i.create_view(device, format, vk::ImageAspectFlags::COLOR, 1))
         .collect::<Result<Vec<_>, _>>()?;
 
+    // create render pass
+    let render_pass = create_render_pass(instance, physical, device, samples, format)?;
+
+    // create albedo info
+    let (albedo_texture, albedo_texture_view) = create_swapchain_albedo_objects(
+        &instance,
+        &physical,
+        &device,
+        &samples,
+        extent.width,
+        extent.height,
+        format,
+    )?;
+
+    // create depth info
+    let (depth_texture, depth_texture_view) = create_swapchain_depth_objects(
+        &instance,
+        &physical,
+        &device,
+        &samples,
+        extent.width,
+        extent.height,
+    )?;
+
+    // create framebuffers
+    let framebuffers: Vec<_> = views
+        .iter()
+        .map(|i| {
+            FrameBuffer::create(
+                device,
+                &render_pass,
+                &[albedo_texture_view, depth_texture_view, *i],
+                extent.width,
+                extent.height,
+            )
+            .expect("Failed to create framebuffer.")
+        })
+        .collect();
+
+    // create target
+    let target = DeviceTargetData {
+        albedo_texture,
+        albedo_texture_view,
+        depth_texture,
+        depth_texture_view,
+    };
+
     // all done
     Ok(SwapchainData {
+        extent,
         handle: swapchain,
         format,
-        extent,
+        framebuffers,
+        render_pass,
+        target,
         textures,
         views,
     })
+}
+
+unsafe fn destroy_swapchain(device: &vulkanalia::Device, swapchain: &SwapchainData) {
+    // destroy framebuffers
+    swapchain
+        .framebuffers
+        .iter()
+        .for_each(|f| f.destroy(&device));
+
+    // destroy render pass
+    device.destroy_render_pass(swapchain.render_pass, None);
+
+    // destroy albedo texture & view
+    swapchain.target.albedo_texture.destroy(&device);
+    swapchain.target.albedo_texture_view.destroy(&device);
+
+    // destroy depth texture & view
+    swapchain.target.depth_texture.destroy(&device);
+    swapchain.target.depth_texture_view.destroy(&device);
+
+    // destroy swapchain views, textures not needed
+    swapchain.views.iter().for_each(|v| v.destroy(&device));
+
+    // destroy swapchain
+    device.destroy_swapchain_khr(swapchain.handle, None);
 }
 
 unsafe fn create_swapchain(
@@ -486,6 +736,104 @@ unsafe fn create_swapchain(
     Ok((swapchain, format, extent))
 }
 
+unsafe fn create_render_pass(
+    instance: &vulkanalia::Instance,
+    physical: &vk::PhysicalDevice,
+    device: &vulkanalia::Device,
+    samples: &vk::SampleCountFlags,
+    format: vk::Format,
+) -> Result<vk::RenderPass> {
+    // Attachments
+    let color_attachment = vk::AttachmentDescription::builder()
+        .format(format)
+        .samples(*samples)
+        .load_op(vk::AttachmentLoadOp::CLEAR)
+        .store_op(vk::AttachmentStoreOp::STORE)
+        .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
+        .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
+        .initial_layout(vk::ImageLayout::UNDEFINED)
+        .final_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL);
+
+    let depth_stencil_attachment = vk::AttachmentDescription::builder()
+        .format(get_depth_format(instance, physical)?)
+        .samples(*samples)
+        .load_op(vk::AttachmentLoadOp::CLEAR)
+        .store_op(vk::AttachmentStoreOp::DONT_CARE)
+        .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
+        .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
+        .initial_layout(vk::ImageLayout::UNDEFINED)
+        .final_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+
+    let color_resolve_attachment = vk::AttachmentDescription::builder()
+        .format(format)
+        .samples(vk::SampleCountFlags::_1)
+        .load_op(vk::AttachmentLoadOp::DONT_CARE)
+        .store_op(vk::AttachmentStoreOp::STORE)
+        .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
+        .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
+        .initial_layout(vk::ImageLayout::UNDEFINED)
+        .final_layout(vk::ImageLayout::PRESENT_SRC_KHR);
+
+    // Subpasses
+
+    let color_attachment_ref = vk::AttachmentReference::builder()
+        .attachment(0)
+        .layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL);
+
+    let depth_stencil_attachment_ref = vk::AttachmentReference::builder()
+        .attachment(1)
+        .layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+
+    let color_resolve_attachment_ref = vk::AttachmentReference::builder()
+        .attachment(2)
+        .layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL);
+
+    let color_attachments = &[color_attachment_ref];
+    let resolve_attachments = &[color_resolve_attachment_ref];
+    let subpass = vk::SubpassDescription::builder()
+        .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
+        .color_attachments(color_attachments)
+        .depth_stencil_attachment(&depth_stencil_attachment_ref)
+        .resolve_attachments(resolve_attachments);
+
+    // Dependencies
+
+    let dependency = vk::SubpassDependency::builder()
+        .src_subpass(vk::SUBPASS_EXTERNAL)
+        .dst_subpass(0)
+        .src_stage_mask(
+            vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT
+                | vk::PipelineStageFlags::EARLY_FRAGMENT_TESTS,
+        )
+        .src_access_mask(vk::AccessFlags::empty())
+        .dst_stage_mask(
+            vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT
+                | vk::PipelineStageFlags::EARLY_FRAGMENT_TESTS,
+        )
+        .dst_access_mask(
+            vk::AccessFlags::COLOR_ATTACHMENT_WRITE
+                | vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_WRITE,
+        );
+
+    // Create
+
+    let attachments = &[
+        color_attachment,
+        depth_stencil_attachment,
+        color_resolve_attachment,
+    ];
+    let subpasses = &[subpass];
+    let dependencies = &[dependency];
+    let info = vk::RenderPassCreateInfo::builder()
+        .attachments(attachments)
+        .subpasses(subpasses)
+        .dependencies(dependencies);
+
+    let render_pass = device.create_render_pass(&info, None)?;
+
+    Ok(render_pass)
+}
+
 fn get_surface_format(formats: &[vk::SurfaceFormatKHR]) -> vk::SurfaceFormatKHR {
     formats
         .iter()
@@ -524,4 +872,60 @@ fn get_extent(window: &Window, capabilities: vk::SurfaceCapabilitiesKHR) -> vk::
             ))
             .build()
     }
+}
+
+unsafe fn get_memory_type_index(
+    instance: &vulkanalia::Instance,
+    physical: &vk::PhysicalDevice,
+    properties: vk::MemoryPropertyFlags,
+    requirements: vk::MemoryRequirements,
+) -> Result<u32> {
+    let memory = instance.get_physical_device_memory_properties(*physical);
+    (0..memory.memory_type_count)
+        .find(|i| {
+            let suitable = (requirements.memory_type_bits & (1 << i)) != 0;
+            let memory_type = memory.memory_types[*i as usize];
+            suitable && memory_type.property_flags.contains(properties)
+        })
+        .ok_or_else(|| anyhow!("Failed to find suitable memory type."))
+}
+
+unsafe fn get_depth_format(
+    instance: &vulkanalia::Instance,
+    physical: &vk::PhysicalDevice,
+) -> Result<vk::Format> {
+    let candidates = &[
+        vk::Format::D32_SFLOAT,
+        vk::Format::D32_SFLOAT_S8_UINT,
+        vk::Format::D24_UNORM_S8_UINT,
+    ];
+
+    get_supported_format(
+        instance,
+        physical,
+        candidates,
+        vk::ImageTiling::OPTIMAL,
+        vk::FormatFeatureFlags::DEPTH_STENCIL_ATTACHMENT,
+    )
+}
+
+unsafe fn get_supported_format(
+    instance: &Instance,
+    physical: &vk::PhysicalDevice,
+    candidates: &[vk::Format],
+    tiling: vk::ImageTiling,
+    features: vk::FormatFeatureFlags,
+) -> Result<vk::Format> {
+    candidates
+        .iter()
+        .cloned()
+        .find(|f| {
+            let properties = instance.get_physical_device_format_properties(*physical, *f);
+            match tiling {
+                vk::ImageTiling::LINEAR => properties.linear_tiling_features.contains(features),
+                vk::ImageTiling::OPTIMAL => properties.optimal_tiling_features.contains(features),
+                _ => false,
+            }
+        })
+        .ok_or_else(|| anyhow!("Failed to find supported format!"))
 }

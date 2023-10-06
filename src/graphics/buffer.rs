@@ -12,7 +12,6 @@ use std::hash::Hash;
 use std::ptr::copy_nonoverlapping as memcpy;
 
 use vulkanalia::prelude::v1_0::*;
-use vulkanalia::vk::DeviceSize;
 
 use super::CommandPool;
 use super::Queue;
@@ -30,7 +29,7 @@ impl Buffer {
     }
 
     unsafe fn get_memory_type_index(
-        instance: &Instance,
+        instance: &vulkanalia::Instance,
         physical: &vk::PhysicalDevice,
         properties: vk::MemoryPropertyFlags,
         requirements: vk::MemoryRequirements,
@@ -46,9 +45,9 @@ impl Buffer {
     }
 
     pub unsafe fn create(
-        instance: &Instance,
+        instance: &vulkanalia::Instance,
         physical: &vk::PhysicalDevice,
-        device: &Device,
+        device: &vulkanalia::Device,
         size: vk::DeviceSize,
         usage: vk::BufferUsageFlags,
         properties: vk::MemoryPropertyFlags,
@@ -95,9 +94,9 @@ impl Buffer {
 
     pub unsafe fn write<T>(
         &self,
-        device: &Device,
-        offset: DeviceSize,
-        size: DeviceSize,
+        device: &vulkanalia::Device,
+        offset: vk::DeviceSize,
+        size: vk::DeviceSize,
         data: &Vec<T>,
     ) {
         // lock memory
@@ -114,7 +113,7 @@ impl Buffer {
     }
 
     pub unsafe fn copy(
-        device: &Device,
+        device: &vulkanalia::Device,
         pool: &CommandPool,
         queue: &Queue,
         source: Buffer,

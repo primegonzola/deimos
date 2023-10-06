@@ -45,6 +45,8 @@ impl Texture {
     }
 }
 
+
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct TextureView {
     pub view: vk::ImageView,
 }
