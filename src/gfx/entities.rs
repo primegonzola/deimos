@@ -108,7 +108,7 @@ pub struct QueueFamilyIndices {
 
 impl QueueFamilyIndices {
     pub unsafe fn get(
-        instance: &Instance,
+        instance: &vulkanalia::Instance,
         surface: &vk::SurfaceKHR,
         physical_device: vk::PhysicalDevice,
     ) -> Result<Self> {
