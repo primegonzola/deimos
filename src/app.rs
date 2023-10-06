@@ -8,26 +8,24 @@
     clippy::unnecessary_wraps
 )]
 
+use crate::gfx;
 use anyhow::Result;
 use winit::window::Window;
 
-use crate::graphics::GraphicsDevice;
-
 /// the app.
-#[derive(Clone, Debug)]
 pub struct App {
-    pub graphics: GraphicsDevice,
+    pub graphics: gfx::Device,
     pub data: AppData,
 }
 
 impl App {
     /// Creates the app.
     pub unsafe fn create(window: &Window) -> Result<Self> {
+        // create graphics
+        let graphics = gfx::Device::create(window, "D E I M O S")?;
+
         // init data
         let data = AppData::default();
-
-        // create graphics device
-        let graphics = GraphicsDevice::create(window)?;
 
         // init app instance
         Ok(Self { graphics, data })
@@ -35,18 +33,14 @@ impl App {
 
     /// update s a frame for the app.
     pub unsafe fn update(&mut self, window: &Window) -> Result<()> {
-        // update graphics device
-        self.graphics.update(window, self.data.models)?;
-
         // all went fine
         Ok(())
     }
 
     /// Destroys the app.
     #[rustfmt::skip]
-    pub unsafe fn destroy(&mut self) {
-
-        // destroy the graphics device
+    pub unsafe fn destroy(&self) {  
+        // destroy graphics
         self.graphics.destroy();
     }
 }

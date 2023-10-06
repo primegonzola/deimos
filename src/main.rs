@@ -66,7 +66,7 @@ fn main() -> Result<()> {
                     minimized = false;
 
                     // mark window as being resized
-                    app.graphics.resized = true;
+                    // app.graphics.resized = true;
                 }
             }
             

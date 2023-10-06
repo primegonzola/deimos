@@ -1,19 +1,8 @@
-#![allow(
-    dead_code,
-    unused_variables,
-    clippy::manual_slice_size_calculation,
-    clippy::too_many_arguments,
-    clippy::unnecessary_wraps
-)]
-
-use std::fmt;
-use std::hash::Hash;
+#![allow(dead_code)]
 
 use anyhow::Result;
 use vulkanalia::prelude::v1_0::*;
 
-// #[repr(transparent)]
-#[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Texture {
     pub image: vk::Image,
     pub memory: vk::DeviceMemory,
@@ -48,30 +37,17 @@ impl Texture {
     }
 
     pub unsafe fn destroy(&self, device: &Device) {
-        // destroy the image
-        device.destroy_image(self.image, None);
+        // check if memory has been allocated
+        if self.memory != vk::DeviceMemory::null() {
+            // destroy the image
+            device.destroy_image(self.image, None);
 
-        // free the memory
-        device.free_memory(self.memory, None);
+            // free the memory
+            device.free_memory(self.memory, None);
+        }
     }
 }
 
-impl Default for Texture {
-    #[inline]
-    fn default() -> Self {
-        Texture::create(vk::Image::null(), vk::DeviceMemory::null())
-    }
-}
-
-impl fmt::Debug for Texture {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // write!(f, "Memory({:p})", self.0 as *const u8)
-        // write!(f, "Image({:p}) - Memory({:p})", self.0 as *const u8, self.0 as *const u8)
-        Ok(())
-    }
-}
-
-#[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct TextureView {
     pub view: vk::ImageView,
 }
@@ -84,20 +60,5 @@ impl TextureView {
     pub unsafe fn destroy(&self, device: &Device) {
         // destroy the image view
         device.destroy_image_view(self.view, None);
-    }
-}
-
-impl Default for TextureView {
-    #[inline]
-    fn default() -> Self {
-        TextureView::create(vk::ImageView::null())
-    }
-}
-
-impl fmt::Debug for TextureView {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // write!(f, "Memory({:p})", self.0 as *const u8)
-        // write!(f, "Image({:p}) - Memory({:p})", self.0 as *const u8, self.0 as *const u8)
-        Ok(())
     }
 }

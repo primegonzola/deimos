@@ -7,14 +7,9 @@
 )]
 
 use anyhow::Result;
-use std::fmt;
-use winit::window::Window;
 
 use vulkanalia::prelude::v1_0::*;
 use vulkanalia::vk::KhrSurfaceExtension;
-use vulkanalia::vk::KhrSwapchainExtension;
-
-use super::QueueFamilyIndices;
 
 
 #[derive(Clone, Debug)]

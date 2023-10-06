@@ -6,17 +6,11 @@
     clippy::unnecessary_wraps
 )]
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::ffi::CStr;
-use std::fs::File;
-use std::io::BufReader;
-use std::mem::size_of;
 use std::os::raw::c_void;
-use std::ptr::slice_from_raw_parts;
-use std::time::Instant;
 
 use anyhow::{anyhow, Result};
-use cgmath::{point3, vec2, vec3, Deg};
 use log::*;
 use vulkanalia::loader::{LibloadingLoader, LIBRARY};
 use vulkanalia::prelude::v1_0::*;
@@ -24,13 +18,13 @@ use vulkanalia::window as vk_window;
 use vulkanalia::Version;
 use winit::window::Window;
 
+use vulkanalia::vk::ExtDebugUtilsExtension;
 use vulkanalia::vk::KhrSurfaceExtension;
 use vulkanalia::vk::KhrSwapchainExtension;
-use vulkanalia::vk::{ExtDebugUtilsExtension, Extent2D, Format};
 
+use super::QueueFamilyIndices;
 use super::SuitabilityError;
 use super::SwapChainSupport;
-use super::{swapchain, QueueFamilyIndices};
 use super::{Texture, TextureView};
 
 // Whether the validation layers should be enabled.
@@ -121,6 +115,12 @@ impl Device {
         unsafe {
             // wait until device is idle
             self.device.device_wait_idle().unwrap();
+
+            // destroy swapchain views
+            self.swapchain
+                .views
+                .iter()
+                .for_each(|v| v.destroy(&self.device));
 
             // destroy swapchain
             self.device
