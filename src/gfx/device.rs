@@ -81,6 +81,7 @@ pub struct Device {
     swapchain: SwapchainData,
     queue: QueueData,
     sync: DeviceSyncData,
+    frame: usize,
 }
 
 impl Device {
@@ -119,7 +120,114 @@ impl Device {
                     present: present_queue,
                 },
                 sync,
+                frame: 0,
             })
+        }
+    }
+
+    /// update the app.
+    pub fn update(&mut self, window: &Window, count: usize) -> Result<()> {
+        unsafe {
+            // create an in flight fence to wait for
+            let in_flight_fence = self.sync.in_flight_fences[self.frame];
+
+            // wait for the fence
+            self.device
+                .wait_for_fences(&[in_flight_fence], true, u64::max_value())?;
+
+            // get next image
+            let result = self.device.acquire_next_image_khr(
+                self.swapchain.handle,
+                u64::max_value(),
+                self.sync.textures_available_semaphores[self.frame],
+                vk::Fence::null(),
+            );
+
+            // get the image or rebuild if not found
+            let index = match result {
+                Ok((index, _)) => index as usize,
+                Err(vk::ErrorCode::OUT_OF_DATE_KHR) => {
+                    return recontruct_swapchain(
+                        window, instance, surface, physical, device, samples, swapchain,
+                    )
+                }
+                Err(e) => return Err(anyhow!(e)),
+            };
+
+            // get the current image to use
+            let texture_in_flight = self.sync.in_flight_textures[index];
+
+            // check if valid
+            if !texture_in_flight.is_null() {
+                // wait for it until it is valid
+                self.device
+                    .wait_for_fences(&[texture_in_flight], true, u64::max_value())?;
+            }
+
+            // set next image to use
+            self.sync.in_flight_textures[index] = in_flight_fence;
+
+            // update command buffer
+            // self.update_command_buffer(index, count)?;
+
+            // update uniform buffer
+            // self.update_uniform_buffer(index)?;
+
+            let wait_semaphores = &[self.sync.textures_available_semaphores[self.frame]];
+            let wait_stages = &[vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
+            let command_buffers = &[self.sync.primary_command_buffers[index].buffer];
+            let signal_semaphores = &[self.sync.render_finished_semaphores[self.frame]];
+            let submit_info = vk::SubmitInfo::builder()
+                .wait_semaphores(wait_semaphores)
+                .wait_dst_stage_mask(wait_stages)
+                .command_buffers(command_buffers)
+                .signal_semaphores(signal_semaphores);
+
+            // reset all fences
+            self.device.reset_fences(&[in_flight_fence])?;
+
+            // submit buffers to queue
+            self.device
+                .queue_submit(self.queue.graphics, &[submit_info], in_flight_fence)?;
+
+            // get the swapchain
+            let swapchains = &[self.swapchain.handle];
+
+            // image index to present
+            let indices = &[index as u32];
+
+            // get the present infoe
+            let present_info = vk::PresentInfoKHR::builder()
+                .wait_semaphores(signal_semaphores)
+                .swapchains(swapchains)
+                .image_indices(indices);
+
+            // get the current presentation info
+            let result = self
+                .device
+                .queue_present_khr(self.queue.present, &present_info);
+
+            // check if changed or resized
+            let changed = result == Ok(vk::SuccessCode::SUBOPTIMAL_KHR)
+                || result == Err(vk::ErrorCode::OUT_OF_DATE_KHR);
+
+            // check if resizing occurred and if resize the swapchain
+            if self.resized || changed {
+                // reset resized status
+                self.resized = false;
+
+                // recreate the swapchain
+                self.recreate_swapchain(window)?;
+            } else if let Err(e) = result {
+                // handle error
+                return Err(anyhow!(e));
+            }
+
+            // update frame counter
+            self.frame = (self.frame + 1) % MAX_FRAMES_IN_FLIGHT;
+
+            // all went fine
+            Ok(())
         }
     }
 
@@ -652,6 +760,25 @@ unsafe fn construct_swapchain(
         textures,
         views,
     })
+}
+
+unsafe fn recontruct_swapchain(
+    window: &Window,
+    instance: &vulkanalia::Instance,
+    surface: &vk::SurfaceKHR,
+    physical: &vk::PhysicalDevice,
+    device: &vulkanalia::Device,
+    samples: &vk::SampleCountFlags,
+    swapchain: &SwapchainData,
+) -> Result<SwapchainData> {
+    // destrpy current swap chain
+    destroy_swapchain(device, swapchain);
+
+    // create new swap chain
+    let swapchain = construct_swapchain(window, &instance, &surface, &physical, &device, &samples)?;
+
+    // all done
+    Ok(swapchain)
 }
 
 unsafe fn destroy_swapchain(device: &vulkanalia::Device, swapchain: &SwapchainData) {
