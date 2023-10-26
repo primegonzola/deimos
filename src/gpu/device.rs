@@ -1399,13 +1399,13 @@ impl GPUCommandEncoder {
         println!("-------------------------------------------------------------------");
         println!(
             "GPUDevice::begin_render_pass \t\t\tbuffer: 0x{:x}",
-            self.device.data.command_buffers[self.device.swap_index].as_raw()
+            self.data.borrow().context.command_buffers[self.device.swap_index].as_raw()
         );
         self.device.begin_render_pass(
             self.device.data.render_pass,
             self.device.data.framebuffers[self.device.swap_index],
             self.device.data.swapchain.extent,
-            self.device.data.command_buffers[self.device.swap_index],
+            self.data.borrow().context.command_buffers[self.device.swap_index],
             Some([0.0, 0.0, 0.0, 1.0]),
             Some(1.0),
         )?;
@@ -1542,10 +1542,10 @@ impl GPUCommandEncoder {
     ) -> Result<GPUCommandBuffer> {
         self.device
             .api
-            .end_command_buffer(self.device.data.command_buffers[self.device.swap_index])?;
+            .end_command_buffer(self.data.borrow().context.command_buffers[self.device.swap_index])?;
         // done
         Ok(GPUCommandBuffer {
-            command_buffer: self.device.data.command_buffers[self.device.swap_index],
+            command_buffer: self.data.borrow().context.command_buffers[self.device.swap_index],
         })
     }
 }
@@ -2535,11 +2535,11 @@ impl GPURenderPassEncoder {
     pub fn end(&self) -> Result<()> {
         self.device
             .api
-            .end_render_pass(self.device.data.command_buffers[self.device.swap_index])?;
+            .end_render_pass(self.data.borrow().context.command_buffers[self.device.swap_index])?;
         // all
         println!(
             "GPUDevice::end \t\t\t\t\tbuffer: 0x{:x}",
-            self.device.data.command_buffers[self.device.swap_index].as_raw()
+            self.data.borrow().context.command_buffers[self.device.swap_index].as_raw()
         );
         println!("-------------------------------------------------------------------");
         Ok(())
@@ -2565,10 +2565,10 @@ impl GPURenderPassEncoder {
     ) -> Result<()> {
         println!(
             "GPUDevice::set_bind_group \t\t\tbuffer: 0x{:x}",
-            self.device.data.command_buffers[self.device.swap_index].as_raw()
+            self.data.borrow().context.command_buffers[self.device.swap_index].as_raw()
         );
         self.device.api.bind_descriptor_sets(
-            self.device.data.command_buffers[self.device.swap_index],
+            self.data.borrow().context.command_buffers[self.device.swap_index],
             vk::PipelineBindPoint::GRAPHICS,
             self.device.data.pipeline_layout,
             0,
@@ -2604,10 +2604,10 @@ impl GPURenderPassEncoder {
     pub fn set_pipeline(&self, _pipeline: &GPURenderPipeline) -> Result<()> {
         println!(
             "GPUDevice::set_pipeline \t\t\tbuffer: 0x{:x}",
-            self.device.data.command_buffers[self.device.swap_index].as_raw()
+            self.data.borrow().context.command_buffers[self.device.swap_index].as_raw()
         );
         self.device.api.bind_pipeline(
-            self.device.data.command_buffers[self.device.swap_index],
+            self.data.borrow().context.command_buffers[self.device.swap_index],
             self.device.data.pipeline,
         )
     }
@@ -2628,10 +2628,10 @@ impl GPURenderPassEncoder {
     ) -> Result<()> {
         println!(
             "GPUDevice::set_index_buffer \t\t\tbuffer: 0x{:x}",
-            self.device.data.command_buffers[self.device.swap_index].as_raw()
+            self.data.borrow().context.command_buffers[self.device.swap_index].as_raw()
         );
         self.device.api.bind_index_buffer(
-            self.device.data.command_buffers[self.device.swap_index],
+            self.data.borrow().context.command_buffers[self.device.swap_index],
             buffer.buffer,
             offset.unwrap_or(0),
             VulkanConverter::convert_gpu_index_format(format),
@@ -2654,10 +2654,10 @@ impl GPURenderPassEncoder {
     ) -> Result<()> {
         println!(
             "GPUDevice::bind_vertex_buffer \t\t\tbuffer: 0x{:x}",
-            self.device.data.command_buffers[self.device.swap_index].as_raw()
+            self.data.borrow().context.command_buffers[self.device.swap_index].as_raw()
         );
         self.device.api.bind_vertex_buffers(
-            self.device.data.command_buffers[self.device.swap_index],
+            self.data.borrow().context.command_buffers[self.device.swap_index],
             slot,
             &[buffer.buffer],
             &[offset.unwrap_or(0)],
@@ -2679,7 +2679,7 @@ impl GPURenderPassEncoder {
         first_instance: Option<GPUSize32>,
     ) -> Result<()> {
         self.device.api.draw(
-            self.device.data.command_buffers[self.device.swap_index],
+            self.data.borrow().context.command_buffers[self.device.swap_index],
             vertex_count,
             instance_count.unwrap_or(1),
             first_vertex.unwrap_or(0),
@@ -2705,10 +2705,10 @@ impl GPURenderPassEncoder {
     ) -> Result<()> {
         println!(
             "GPUDevice::draw_indexed \t\t\tbuffer: 0x{:x}",
-            self.device.data.command_buffers[self.device.swap_index].as_raw()
+            self.data.borrow().context.command_buffers[self.device.swap_index].as_raw()
         );
         self.device.api.draw_indexed(
-            self.device.data.command_buffers[self.device.swap_index],
+            self.data.borrow().context.command_buffers[self.device.swap_index],
             index_count,
             instance_count.unwrap_or(1),
             first_index.unwrap_or(0),
@@ -2730,7 +2730,7 @@ impl GPURenderPassEncoder {
         indirect_offset: GPUSize64,
     ) -> Result<()> {
         self.device.api.draw_indirect(
-            self.device.data.command_buffers[self.device.swap_index],
+            self.data.borrow().context.command_buffers[self.device.swap_index],
             indirect_buffer.buffer,
             indirect_offset,
             1,
@@ -2751,7 +2751,7 @@ impl GPURenderPassEncoder {
         indirect_offset: GPUSize64,
     ) -> Result<()> {
         self.device.api.draw_indexed_indirect(
-            self.device.data.command_buffers[self.device.swap_index],
+            self.data.borrow().context.command_buffers[self.device.swap_index],
             indirect_buffer.buffer,
             indirect_offset,
             1,
