@@ -9,8 +9,6 @@ use winit::window::Window;
 use crate::gpu::structs::*;
 use crate::vulkan::{self};
 
-use super::geometry;
-
 pub struct GPUImageCopyExternalImageSource {}
 
 pub struct OffscreenCanvas {}
@@ -1726,8 +1724,8 @@ impl GPUDeviceContext {
             self.pipeline_layout,
             device.data.swapchain.extent,
             device.data.samples,
-            geometry::Mesh::binding_description(),
-            geometry::Mesh::attribute_descriptions().to_vec(),
+            vulkan::Mesh::binding_description(),
+            vulkan::Mesh::attribute_descriptions().to_vec(),
         )?;
 
         // create framebuffers
@@ -1907,10 +1905,12 @@ impl GPUDeviceContext {
             if self.framebuffers.len() > 0 {
                 // destroy uniform buffers
                 for uniform_buffer in self.uniform_buffers.iter() {
+                    // destroy buffer
                     device
                         .api
                         .logical_device
                         .destroy_buffer(uniform_buffer.0, None);
+                    // free the memory
                     device
                         .api
                         .logical_device
@@ -2572,7 +2572,7 @@ impl GPURenderPassEncoder {
             vk::PipelineBindPoint::GRAPHICS,
             self.data.borrow().context.pipeline_layout,
             0,
-            &[self.device.data.descriptor_sets[self.device.swap_index]],
+            &[self.data.borrow().context.descriptor_sets[self.device.swap_index]],
             &[],
         )
     }

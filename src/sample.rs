@@ -367,9 +367,9 @@ impl Sample {
             self.create_pipeline()?;
 
         // update uniform
-        self.graphics
-            .handle
-            .update_uniform_buffer(self.graphics.handle.swap_index)?;
+        // self.graphics
+        //     .handle
+        //     .update_uniform_buffer(self.graphics.handle.swap_index)?;
 
         // render the scene
         self.render_scene(&render_pass_encoder, &pipeline, camera_bind_group)?;

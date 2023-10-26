@@ -5,7 +5,6 @@
 use std::time::Instant;
 
 use anyhow::{anyhow, Result};
-use cgmath::{point3, vec3, Deg};
 use vulkanalia::prelude::v1_0::*;
 use winit::window::Window;
 
@@ -14,7 +13,7 @@ use vulkanalia::vk::KhrSurfaceExtension;
 use vulkanalia::vk::KhrSwapchainExtension;
 
 use super::{
-    CameraUniform, Mat4, Mesh, Swapchain, Texture, TextureView, VulkanApi, VulkanDeviceSync,
+    CameraUniform, Mesh, Swapchain, Texture, TextureView, VulkanApi, VulkanDeviceSync,
     MAX_DESCRIPTOR_SETS, MAX_FRAMES_IN_FLIGHT, VALIDATION_ENABLED,
 };
 
@@ -235,7 +234,7 @@ impl VulkanDevice {
             self.sync.textures_in_flight[self.swap_index] = self.sync.in_flight_fence;
 
             // update buffer
-            self.update_uniform_buffer(self.swap_index)?;
+            // self.update_uniform_buffer(self.swap_index)?;
 
             // all done
             Ok(())
@@ -434,44 +433,44 @@ impl VulkanDevice {
         unsafe { self.api.logical_device.device_wait_idle().unwrap() }
     }
 
-    pub fn update_uniform_buffer(&self, image_index: usize) -> Result<()> {
-        #[rustfmt::skip]
+    // pub fn update_uniform_buffer(&self, image_index: usize) -> Result<()> {
+    //     #[rustfmt::skip]
 
-        let time = self.start.elapsed().as_secs_f32();
-        let model = Mat4::from_axis_angle(vec3(0.0, 0.0, 1.0), Deg(90.0) * time);
-        let view = Mat4::look_at_rh(
-            point3::<f32>(2.0, 2.0, 2.0),
-            point3::<f32>(0.0, 0.0, 0.0),
-            vec3(0.0, 0.0, 1.0),
-        );
-        #[rustfmt::skip]
-        let correction = Mat4::new(
-            1.0,  0.0,       0.0, 0.0,
-            0.0, -1.0,       0.0, 0.0,
-            0.0,  0.0, 1.0 / 2.0, 0.0,
-            0.0,  0.0, 1.0 / 2.0, 1.0,
-        );
-        let extent = self.data.swapchain.extent;
-        let projection = correction
-            * cgmath::perspective(
-                Deg(45.0),
-                extent.width as f32 / extent.height as f32,
-                0.1,
-                10.0,
-            );
-        let ubo = CameraUniform {
-            model,
-            view,
-            projection,
-        };
+    //     let time = self.start.elapsed().as_secs_f32();
+    //     let model = Mat4::from_axis_angle(vec3(0.0, 0.0, 1.0), Deg(90.0) * time);
+    //     let view = Mat4::look_at_rh(
+    //         point3::<f32>(2.0, 2.0, 2.0),
+    //         point3::<f32>(0.0, 0.0, 0.0),
+    //         vec3(0.0, 0.0, 1.0),
+    //     );
+    //     #[rustfmt::skip]
+    //     let correction = Mat4::new(
+    //         1.0,  0.0,       0.0, 0.0,
+    //         0.0, -1.0,       0.0, 0.0,
+    //         0.0,  0.0, 1.0 / 2.0, 0.0,
+    //         0.0,  0.0, 1.0 / 2.0, 1.0,
+    //     );
+    //     let extent = self.data.swapchain.extent;
+    //     let projection = correction
+    //         * cgmath::perspective(
+    //             Deg(45.0),
+    //             extent.width as f32 / extent.height as f32,
+    //             0.1,
+    //             10.0,
+    //         );
+    //     let ubo = CameraUniform {
+    //         model,
+    //         view,
+    //         projection,
+    //     };
 
-        // update
-        self.api
-            .write_buffer(self.data.uniform_buffers[image_index].1, 0, &[ubo].to_vec())?;
+    //     // update
+    //     self.api
+    //         .write_buffer(self.data.uniform_buffers[image_index].1, 0, &[ubo].to_vec())?;
 
-        // all done
-        Ok(())
-    }
+    //     // all done
+    //     Ok(())
+    // }
 
     fn recreate_swapchain(&mut self, window: &Window) -> Result<()> {
         // wait until idle
