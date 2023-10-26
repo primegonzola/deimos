@@ -233,18 +233,12 @@ impl VulkanDevice {
             // move next in flight fence to current
             self.sync.textures_in_flight[self.swap_index] = self.sync.in_flight_fence;
 
-            // update buffer
-            // self.update_uniform_buffer(self.swap_index)?;
-
             // all done
             Ok(())
         }
     }
 
     pub fn clear_frame(&mut self, color: Option<[f32; 4]>, depth: Option<f32>) -> Result<()> {
-        // notify
-        print!("clearimg frame");
-
         // begin render pass
         self.begin_render_pass(
             self.data.render_pass,
@@ -279,13 +273,13 @@ impl VulkanDevice {
             // let command_buffers = &[self.data.command_buffers[self.swap_index]];
             // add to command buffer queue
 
-            // print len
-            if self.data.command_buffer_queues[self.swap_index].len() > 0 {
-                println!(
-                    "VKDevice::end_frame_internal\t\t\tbuffer: 0x{:x}",
-                    self.data.command_buffer_queues[self.swap_index][0].as_raw()
-                );
-            }
+            // // print len
+            // if self.data.command_buffer_queues[self.swap_index].len() > 0 {
+            //     println!(
+            //         "VKDevice::end_frame_internal\t\t\tbuffer: 0x{:x}",
+            //         self.data.command_buffer_queues[self.swap_index][0].as_raw()
+            //     );
+            // }
 
             // check anything in queue
             if self.data.command_buffer_queues[self.swap_index].len() == 0 {
@@ -298,10 +292,10 @@ impl VulkanDevice {
 
             // check if any
             if self.data.command_buffer_queues[self.swap_index].len() > 0 {
-                println!(
-                    "VKDevice::end_frame\t\t\t\tbuffer: 0x{:x}",
-                    self.data.command_buffer_queues[self.swap_index][0].as_raw()
-                );
+                // println!(
+                //     "VKDevice::end_frame\t\t\t\tbuffer: 0x{:x}",
+                //     self.data.command_buffer_queues[self.swap_index][0].as_raw()
+                // );
 
                 // consolidate command buffers
                 let command_buffers = &self.data.command_buffer_queues[self.swap_index];
@@ -432,45 +426,6 @@ impl VulkanDevice {
     pub fn wait_until_idle(&self) {
         unsafe { self.api.logical_device.device_wait_idle().unwrap() }
     }
-
-    // pub fn update_uniform_buffer(&self, image_index: usize) -> Result<()> {
-    //     #[rustfmt::skip]
-
-    //     let time = self.start.elapsed().as_secs_f32();
-    //     let model = Mat4::from_axis_angle(vec3(0.0, 0.0, 1.0), Deg(90.0) * time);
-    //     let view = Mat4::look_at_rh(
-    //         point3::<f32>(2.0, 2.0, 2.0),
-    //         point3::<f32>(0.0, 0.0, 0.0),
-    //         vec3(0.0, 0.0, 1.0),
-    //     );
-    //     #[rustfmt::skip]
-    //     let correction = Mat4::new(
-    //         1.0,  0.0,       0.0, 0.0,
-    //         0.0, -1.0,       0.0, 0.0,
-    //         0.0,  0.0, 1.0 / 2.0, 0.0,
-    //         0.0,  0.0, 1.0 / 2.0, 1.0,
-    //     );
-    //     let extent = self.data.swapchain.extent;
-    //     let projection = correction
-    //         * cgmath::perspective(
-    //             Deg(45.0),
-    //             extent.width as f32 / extent.height as f32,
-    //             0.1,
-    //             10.0,
-    //         );
-    //     let ubo = CameraUniform {
-    //         model,
-    //         view,
-    //         projection,
-    //     };
-
-    //     // update
-    //     self.api
-    //         .write_buffer(self.data.uniform_buffers[image_index].1, 0, &[ubo].to_vec())?;
-
-    //     // all done
-    //     Ok(())
-    // }
 
     fn recreate_swapchain(&mut self, window: &Window) -> Result<()> {
         // wait until idle

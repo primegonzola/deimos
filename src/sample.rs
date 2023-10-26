@@ -11,7 +11,10 @@ use winit::window::Window;
 
 // use vulkanalia::prelude::v1_0::*;
 
-use crate::gpu::{self};
+use crate::{
+    gpu::{self},
+    vulkan::CameraUniform,
+};
 
 pub struct Sample {
     graphics: gpu::GPUDevice,
@@ -48,18 +51,10 @@ impl Sample {
             })?;
 
         // create camera uniform
-        // let camera_uniform_buffer = graphics.create_buffer(gpu::GPUBufferDescriptor {
-        //     size: std::mem::size_of::<gpu::GPUCameraUniform>() as u64,
-        //     usage: gpu::GPUBufferUsageFlags::UNIFORM,
-        //     mapped_at_creation: None,
-        // })?;
-        let camera_uniform_buffer = gpu::GPUBuffer {
-            size: 0,
-            usage: gpu::GPUBufferUsageFlags::UNIFORM,
-            map_state: gpu::GPUBufferMapState::Unmapped,
-            buffer: graphics.handle.data.uniform_buffers[graphics.handle.swap_index].0,
-            memory: graphics.handle.data.uniform_buffers[graphics.handle.swap_index].1,
-        };
+        let camera_uniform_buffer = graphics.create_typed_buffer::<CameraUniform>(
+            gpu::GPUBufferUsageFlags::UNIFORM,
+            &vec![CameraUniform::default()],
+        )?;
 
         // load mesh
         data.mesh = gpu::Mesh::create(
@@ -319,10 +314,6 @@ impl Sample {
         pipeline: &gpu::GPURenderPipeline,
         camera_bind_group: gpu::GPUBindGroup,
     ) -> Result<()> {
-        // // update camera uniform buffer
-        // self.camera_uniform_buffer
-        //     .write(&self.graphics, &vec![self.get_current_camera()?])?;
-
         // bind camera group
         render_pass_encoder.set_bind_group(0, &camera_bind_group, None)?;
 
@@ -366,11 +357,6 @@ impl Sample {
         let (pipeline_layout, pipeline, bind_group_layout, camera_bind_group) =
             self.create_pipeline()?;
 
-        // update uniform
-        // self.graphics
-        //     .handle
-        //     .update_uniform_buffer(self.graphics.handle.swap_index)?;
-
         // render the scene
         self.render_scene(&render_pass_encoder, &pipeline, camera_bind_group)?;
 
@@ -381,7 +367,7 @@ impl Sample {
         let command_buffer = command_encoder.finish(None)?;
 
         // submit command buffer
-        queue.submit(&[command_buffer])?;
+        // queue.submit(&[command_buffer])?;
 
         // destroy command buffer
         command_buffer.destroy();
@@ -418,6 +404,13 @@ impl Sample {
         } else {
             // let's start the frame
             self.graphics.begin_frame(window)?;
+
+            // update camera buffer
+            self.graphics.write_buffer(
+                &self.camera_uniform_buffer,
+                0,
+                &vec![self.get_current_camera()?],
+            )?;
 
             // render the contents
             self.render_contents()?;

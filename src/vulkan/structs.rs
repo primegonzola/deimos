@@ -8,6 +8,7 @@ use thiserror::Error;
 use anyhow::{anyhow, Result};
 use vulkanalia::prelude::v1_0::*;
 use vulkanalia::vk::KhrSurfaceExtension;
+use cgmath::SquareMatrix;
 
 #[derive(Copy, Clone, Debug)]
 pub struct QueueFamilyIndices {
@@ -84,6 +85,16 @@ pub struct CameraUniform {
     pub model: cgmath::Matrix4<f32>,
     pub view: cgmath::Matrix4<f32>,
     pub projection: cgmath::Matrix4<f32>,
+}
+
+impl Default for CameraUniform{
+    fn default() -> Self {
+        Self {
+            model: cgmath::Matrix4::identity(),
+            view: cgmath::Matrix4::identity(),
+            projection: cgmath::Matrix4::identity(),
+        }
+    }
 }
 
 #[derive(Debug, Error)]

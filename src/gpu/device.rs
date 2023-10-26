@@ -9,9 +9,19 @@ use winit::window::Window;
 use crate::gpu::structs::*;
 use crate::vulkan::{self};
 
+use super::geometry;
+
 pub struct GPUImageCopyExternalImageSource {}
 
 pub struct OffscreenCanvas {}
+
+pub struct Logger {}
+
+impl Logger {
+    pub fn info(_message: &str) {
+        // println!("{}", message);
+    }
+}
 
 pub struct GPUBindingResource {
     pub sampler: Option<GPUSampler>,
@@ -1317,10 +1327,10 @@ impl GPUBuffer {
         }
     }
 
-    pub fn write<T>(&self, device: &GPUDevice, data: &Vec<T>) -> Result<()> {
-        // delegate
-        device.handle.api.write_buffer::<T>(self.memory, 0, data)
-    }
+    // pub fn write<T>(&self, device: &GPUDevice, data: &Vec<T>) -> Result<()> {
+    //     // delegate
+    //     device.handle.api.write_buffer::<T>(self.memory, 0, data)
+    // }
 
     // /**
     //  * Maps the given range of the {@link GPUBuffer} and resolves the returned {@link Promise} when the
@@ -1394,10 +1404,13 @@ impl GPUCommandEncoder {
         &self,
         _descriptor: GPURenderPassDescriptor,
     ) -> Result<GPURenderPassEncoder> {
-        println!("-------------------------------------------------------------------");
-        println!(
-            "GPUDevice::begin_render_pass \t\t\tbuffer: 0x{:x}",
-            self.data.borrow().context.command_buffers[self.device.swap_index].as_raw()
+        Logger::info("-------------------------------------------------------------------");
+        Logger::info(
+            format!(
+                "GPUDevice::begin_render_pass \t\t\tbuffer: 0x{:x}",
+                self.data.borrow().context.command_buffers[self.device.swap_index].as_raw()
+            )
+            .as_str(),
         );
         self.device.begin_render_pass(
             self.data.borrow().context.render_pass,
@@ -1538,9 +1551,9 @@ impl GPUCommandEncoder {
         &self,
         _descriptor: Option<GPUCommandBufferDescriptor>,
     ) -> Result<GPUCommandBuffer> {
-        self.device
-            .api
-            .end_command_buffer(self.data.borrow().context.command_buffers[self.device.swap_index])?;
+        self.device.api.end_command_buffer(
+            self.data.borrow().context.command_buffers[self.device.swap_index],
+        )?;
         // done
         Ok(GPUCommandBuffer {
             command_buffer: self.data.borrow().context.command_buffers[self.device.swap_index],
@@ -1724,8 +1737,8 @@ impl GPUDeviceContext {
             self.pipeline_layout,
             device.data.swapchain.extent,
             device.data.samples,
-            vulkan::Mesh::binding_description(),
-            vulkan::Mesh::attribute_descriptions().to_vec(),
+            geometry::Mesh::binding_description(),
+            geometry::Mesh::attribute_descriptions().to_vec(),
         )?;
 
         // create framebuffers
@@ -1972,8 +1985,8 @@ impl GPUDevice {
     }
 
     pub fn begin_frame(&mut self, window: &Window) -> Result<()> {
-        println!("-------------------------------------------------------------------");
-        println!("GPUDevice::begin_frame");
+        Logger::info("-------------------------------------------------------------------");
+        Logger::info("GPUDevice::begin_frame");
 
         self.handle.begin_frame(window)
     }
@@ -1981,10 +1994,13 @@ impl GPUDevice {
     pub fn end_frame(&mut self, window: &Window) -> Result<()> {
         // print len
         if self.data.borrow().context.command_buffer_queues[self.handle.swap_index].len() > 0 {
-            println!(
-                "GPUDevice::end_frame \t\t\t\tbuffer: 0x{:x}",
-                self.data.borrow().context.command_buffer_queues[self.handle.swap_index][0]
-                    .as_raw()
+            Logger::info(
+                format!(
+                    "GPUDevice::end_frame \t\t\t\tbuffer: 0x{:x}",
+                    self.data.borrow().context.command_buffer_queues[self.handle.swap_index][0]
+                        .as_raw()
+                )
+                .as_str(),
             );
         }
 
@@ -1999,8 +2015,8 @@ impl GPUDevice {
         // clear buffers
         self.data.borrow_mut().context.command_buffer_queues[self.handle.swap_index].clear();
 
-        println!("GPUDevice::end_frame");
-        println!("-------------------------------------------------------------------");
+        Logger::info("GPUDevice::end_frame");
+        Logger::info("-------------------------------------------------------------------");
         Ok(())
     }
 
@@ -2110,14 +2126,14 @@ impl GPUDevice {
             GPUBufferUsageFlags::UNIFORM => {
                 // create buffer
                 let buffer = self.handle.api.create_buffer::<T>(
-                    data.len(),
+                    data.len() * std::mem::size_of::<T>(),
                     vk::BufferUsageFlags::INDEX_BUFFER,
                     vk::MemoryPropertyFlags::HOST_COHERENT | vk::MemoryPropertyFlags::HOST_VISIBLE,
                 )?;
                 // done
                 Ok(GPUBuffer {
                     usage,
-                    size: data.len() as u64 * std::mem::size_of::<T>() as u64,
+                    size: (data.len() * std::mem::size_of::<T>()) as u64,
                     map_state: GPUBufferMapState::Unmapped,
                     buffer: buffer.0,
                     memory: buffer.1,
@@ -2278,6 +2294,10 @@ impl GPUDevice {
     pub fn pop_error_scope(&self) -> Result<Option<GPUError>> {
         unimplemented!("pop_error_scope")
     }
+
+    pub fn write_buffer<T>(&self, buffer: &GPUBuffer, offset: usize, data: &Vec<T>) -> Result<()> {
+        self.handle.api.write_buffer(buffer.memory, offset, data)
+    }
 }
 
 pub struct GPUDeviceLostInfo {
@@ -2352,9 +2372,12 @@ impl GPUQueue {
         if self.device.swap_index < self.data.borrow_mut().context.command_buffer_queues.len() {
             // print
             if command_buffers.len() > 0 {
-                println!(
-                    "GPUDevice::submit \t\t\t\tbuffer: 0x{:x}",
-                    command_buffers[0].command_buffer.as_raw()
+                Logger::info(
+                    format!(
+                        "GPUDevice::submit \t\t\t\tbuffer: 0x{:x}",
+                        command_buffers[0].command_buffer.as_raw()
+                    )
+                    .as_str(),
                 );
             }
             // submit to local command buffer queue
@@ -2537,11 +2560,14 @@ impl GPURenderPassEncoder {
             .api
             .end_render_pass(self.data.borrow().context.command_buffers[self.device.swap_index])?;
         // all
-        println!(
-            "GPUDevice::end \t\t\t\t\tbuffer: 0x{:x}",
-            self.data.borrow().context.command_buffers[self.device.swap_index].as_raw()
+        Logger::info(
+            format!(
+                "GPUDevice::end \t\t\t\t\tbuffer: 0x{:x}",
+                self.data.borrow().context.command_buffers[self.device.swap_index].as_raw()
+            )
+            .as_str(),
         );
-        println!("-------------------------------------------------------------------");
+        Logger::info("-------------------------------------------------------------------");
         Ok(())
     }
 
@@ -2563,9 +2589,12 @@ impl GPURenderPassEncoder {
         _bind_group: &GPUBindGroup,
         _dynamic_offsets: Option<Vec<GPUBufferDynamicOffset>>,
     ) -> Result<()> {
-        println!(
-            "GPUDevice::set_bind_group \t\t\tbuffer: 0x{:x}",
-            self.data.borrow().context.command_buffers[self.device.swap_index].as_raw()
+        Logger::info(
+            format!(
+                "GPUDevice::set_bind_group \t\t\tbuffer: 0x{:x}",
+                self.data.borrow().context.command_buffers[self.device.swap_index].as_raw()
+            )
+            .as_str(),
         );
         self.device.api.bind_descriptor_sets(
             self.data.borrow().context.command_buffers[self.device.swap_index],
@@ -2602,9 +2631,12 @@ impl GPURenderPassEncoder {
      * @param pipeline - The render pipeline to use for subsequent drawing commands.
      */
     pub fn set_pipeline(&self, _pipeline: &GPURenderPipeline) -> Result<()> {
-        println!(
-            "GPUDevice::set_pipeline \t\t\tbuffer: 0x{:x}",
-            self.data.borrow().context.command_buffers[self.device.swap_index].as_raw()
+        Logger::info(
+            format!(
+                "GPUDevice::set_pipeline \t\t\tbuffer: 0x{:x}",
+                self.data.borrow().context.command_buffers[self.device.swap_index].as_raw(),
+            )
+            .as_str(),
         );
         self.device.api.bind_pipeline(
             self.data.borrow().context.command_buffers[self.device.swap_index],
@@ -2626,9 +2658,12 @@ impl GPURenderPassEncoder {
         offset: Option<GPUSize64>,
         _size: Option<GPUSize64>,
     ) -> Result<()> {
-        println!(
-            "GPUDevice::set_index_buffer \t\t\tbuffer: 0x{:x}",
-            self.data.borrow().context.command_buffers[self.device.swap_index].as_raw()
+        Logger::info(
+            format!(
+                "GPUDevice::set_index_buffer \t\t\tbuffer: 0x{:x}",
+                self.data.borrow().context.command_buffers[self.device.swap_index].as_raw(),
+            )
+            .as_str(),
         );
         self.device.api.bind_index_buffer(
             self.data.borrow().context.command_buffers[self.device.swap_index],
@@ -2652,9 +2687,12 @@ impl GPURenderPassEncoder {
         offset: Option<GPUSize64>,
         _size: Option<GPUSize64>,
     ) -> Result<()> {
-        println!(
-            "GPUDevice::bind_vertex_buffer \t\t\tbuffer: 0x{:x}",
-            self.data.borrow().context.command_buffers[self.device.swap_index].as_raw()
+        Logger::info(
+            format!(
+                "GPUDevice::bind_vertex_buffer \t\t\tbuffer: 0x{:x}",
+                self.data.borrow().context.command_buffers[self.device.swap_index].as_raw(),
+            )
+            .as_str(),
         );
         self.device.api.bind_vertex_buffers(
             self.data.borrow().context.command_buffers[self.device.swap_index],
@@ -2703,10 +2741,10 @@ impl GPURenderPassEncoder {
         base_vertex: Option<GPUSignedOffset32>,
         first_instance: Option<GPUSize32>,
     ) -> Result<()> {
-        println!(
+        Logger::info(format!(
             "GPUDevice::draw_indexed \t\t\tbuffer: 0x{:x}",
-            self.data.borrow().context.command_buffers[self.device.swap_index].as_raw()
-        );
+            self.data.borrow().context.command_buffers[self.device.swap_index].as_raw(),
+        ).as_str());
         self.device.api.draw_indexed(
             self.data.borrow().context.command_buffers[self.device.swap_index],
             index_count,
