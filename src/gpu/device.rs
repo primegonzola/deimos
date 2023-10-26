@@ -2020,6 +2020,11 @@ impl GPUDevice {
         Ok(())
     }
 
+    pub fn present(&self, _window:&Window, handler:fn())->Result<()>{
+        handler();
+        Ok(())
+    }
+
     pub fn reset(&mut self, window: &Window) -> Result<()> {
         // reset device
         self.handle.reset(window)?;

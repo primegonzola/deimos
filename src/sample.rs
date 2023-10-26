@@ -415,12 +415,18 @@ impl Sample {
             // render the contents
             self.render_contents()?;
 
+            // self.graphics.present(window, Sample::test)?;
+
             // end the current frame
             self.graphics.end_frame(window)?;
         }
 
         // all fine
         Ok(())
+    }
+
+    pub fn test(){
+
     }
 
     pub fn destroy(&mut self) {
