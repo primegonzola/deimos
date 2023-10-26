@@ -1402,8 +1402,8 @@ impl GPUCommandEncoder {
             self.data.borrow().context.command_buffers[self.device.swap_index].as_raw()
         );
         self.device.begin_render_pass(
-            self.device.data.render_pass,
-            self.device.data.framebuffers[self.device.swap_index],
+            self.data.borrow().context.render_pass,
+            self.data.borrow().context.framebuffers[self.device.swap_index],
             self.device.data.swapchain.extent,
             self.data.borrow().context.command_buffers[self.device.swap_index],
             Some([0.0, 0.0, 0.0, 1.0]),
@@ -2570,7 +2570,7 @@ impl GPURenderPassEncoder {
         self.device.api.bind_descriptor_sets(
             self.data.borrow().context.command_buffers[self.device.swap_index],
             vk::PipelineBindPoint::GRAPHICS,
-            self.device.data.pipeline_layout,
+            self.data.borrow().context.pipeline_layout,
             0,
             &[self.device.data.descriptor_sets[self.device.swap_index]],
             &[],
@@ -2608,7 +2608,7 @@ impl GPURenderPassEncoder {
         );
         self.device.api.bind_pipeline(
             self.data.borrow().context.command_buffers[self.device.swap_index],
-            self.device.data.pipeline,
+            self.data.borrow().context.pipeline,
         )
     }
     /**
