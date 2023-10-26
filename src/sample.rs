@@ -367,7 +367,7 @@ impl Sample {
         let command_buffer = command_encoder.finish(None)?;
 
         // submit command buffer
-        // queue.submit(&[command_buffer])?;
+        queue.submit(&[command_buffer])?;
 
         // destroy command buffer
         command_buffer.destroy();

@@ -889,6 +889,33 @@ impl VulkanApi {
         }
     }
 
+    // pub fn clear_color_image(
+    //     &self,
+    //     command_pool: vk::CommandPool,
+    //     queue: vk::Queue,
+    //     image: vk::Image,
+    //     color: vk::ClearColorValue,
+    // ) -> Result<()> {
+    //     unsafe {            
+    //         let command_buffer = self.begin_single_commands(command_pool)?;
+    //         let range = vk::ImageSubresourceRange::builder()
+    //             .aspect_mask(vk::ImageAspectFlags::COLOR)
+    //             .base_mip_level(0)
+    //             .level_count(0)
+    //             .base_array_layer(0)
+    //             .layer_count(1);
+    //         self.logical_device.cmd_clear_color_image(
+    //             command_buffer,
+    //             image,
+    //             vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+    //             &color,
+    //             &[range]
+    //         );
+    //         self.end_single_commands(queue, command_pool, command_buffer)?;
+    //         Ok(())
+    //     }
+    // }
+
     // pub fn create_buffer(
     //     &self,
     //     size: vk::DeviceSize,

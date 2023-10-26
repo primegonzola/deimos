@@ -200,6 +200,36 @@ impl VulkanDevice {
         }
     }
 
+
+    pub fn clear_frame(&mut self, color: Option<[f32; 4]>, depth: Option<f32>) -> Result<()> {
+        // begin render pass
+        self.begin_render_pass(
+            self.data.render_pass,
+            self.data.framebuffers[self.swap_index],
+            self.data.swapchain.extent,
+            self.data.command_buffers[self.swap_index],
+            color,
+            depth,
+        )?;
+
+        // end render pass
+        self.end_render_pass(self.data.command_buffers[self.swap_index])?;
+
+        // end command buffer
+        self.api
+            .end_command_buffer(self.data.command_buffers[self.swap_index])?;
+
+        // add command to queue
+        self.data
+            .command_buffer_queues
+            .get_mut(self.swap_index)
+            .unwrap()
+            .push(self.data.command_buffers[self.swap_index]);
+
+        // all done
+        Ok(())
+    }
+
     pub fn begin_frame(&mut self, window: &Window) -> Result<()> {
         unsafe {
             self.sync.in_flight_fence = self.sync.fences_in_flight[self.frame_index];
@@ -238,49 +268,8 @@ impl VulkanDevice {
         }
     }
 
-    pub fn clear_frame(&mut self, color: Option<[f32; 4]>, depth: Option<f32>) -> Result<()> {
-        // begin render pass
-        self.begin_render_pass(
-            self.data.render_pass,
-            self.data.framebuffers[self.swap_index],
-            self.data.swapchain.extent,
-            self.data.command_buffers[self.swap_index],
-            color,
-            depth,
-        )?;
-
-        // end render pass
-        self.end_render_pass(self.data.command_buffers[self.swap_index])?;
-
-        // end command buffer
-        self.api
-            .end_command_buffer(self.data.command_buffers[self.swap_index])?;
-
-        // add command to queue
-        self.data
-            .command_buffer_queues
-            .get_mut(self.swap_index)
-            .unwrap()
-            .push(self.data.command_buffers[self.swap_index]);
-
-        // all done
-        Ok(())
-    }
-
     pub fn end_frame(&mut self, window: &Window) -> Result<()> {
         unsafe {
-            // create command buffers to submit for rendering
-            // let command_buffers = &[self.data.command_buffers[self.swap_index]];
-            // add to command buffer queue
-
-            // // print len
-            // if self.data.command_buffer_queues[self.swap_index].len() > 0 {
-            //     println!(
-            //         "VKDevice::end_frame_internal\t\t\tbuffer: 0x{:x}",
-            //         self.data.command_buffer_queues[self.swap_index][0].as_raw()
-            //     );
-            // }
-
             // check anything in queue
             if self.data.command_buffer_queues[self.swap_index].len() == 0 {
                 // clear frame
@@ -292,11 +281,6 @@ impl VulkanDevice {
 
             // check if any
             if self.data.command_buffer_queues[self.swap_index].len() > 0 {
-                // println!(
-                //     "VKDevice::end_frame\t\t\t\tbuffer: 0x{:x}",
-                //     self.data.command_buffer_queues[self.swap_index][0].as_raw()
-                // );
-
                 // consolidate command buffers
                 let command_buffers = &self.data.command_buffer_queues[self.swap_index];
                 // all the rest is waiting for buffers and output generated
