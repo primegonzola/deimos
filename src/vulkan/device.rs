@@ -656,19 +656,19 @@ pub struct VulkanDeviceData {
 
     // queues
     pub graphics_queue: vk::Queue,
-    pub present_queue: vk::Queue,
+    present_queue: vk::Queue,
 
     // swapchain
     pub swapchain: Swapchain,
 
     // pipeline layout
-    pub render_pass: vk::RenderPass,
-    pub descriptor_set_layout: vk::DescriptorSetLayout,
-    pub pipeline_layout: vk::PipelineLayout,
-    pub pipeline: vk::Pipeline,
+    render_pass: vk::RenderPass,
+    descriptor_set_layout: vk::DescriptorSetLayout,
+    pipeline_layout: vk::PipelineLayout,
+    pipeline: vk::Pipeline,
 
     // framebuffers
-    pub framebuffers: Vec<vk::Framebuffer>,
+    framebuffers: Vec<vk::Framebuffer>,
 
     // command Pool
     pub command_pool: vk::CommandPool,
@@ -681,7 +681,7 @@ pub struct VulkanDeviceData {
     pub descriptor_sets: Vec<vk::DescriptorSet>,
 
     // command buffers
-    pub command_buffers: Vec<vk::CommandBuffer>,
+    command_buffers: Vec<vk::CommandBuffer>,
     pub command_buffer_queues: Vec<Vec<vk::CommandBuffer>>,
 }
 
