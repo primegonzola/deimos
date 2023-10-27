@@ -1716,7 +1716,7 @@ impl GPUDeviceContext {
         // create uniform buffers
         self.uniform_buffers = device
             .api
-            .create_uniform_buffers::<vulkan::CameraUniform>(device.data.swapchain.views.len())?;
+            .create_uniform_buffers::<GPUCameraUniform>(device.data.swapchain.views.len())?;
 
         // create render pass
         self.render_pass = device
@@ -1767,7 +1767,7 @@ impl GPUDeviceContext {
         )?;
 
         // update descriptor sets
-        device.api.update_descriptor_sets::<vulkan::CameraUniform>(
+        device.api.update_descriptor_sets::<GPUCameraUniform>(
             &self.descriptor_sets,
             &self.uniform_buffers,
             device.data.back_albedo_view.handle,
@@ -2020,7 +2020,7 @@ impl GPUDevice {
         Ok(())
     }
 
-    pub fn present(&self, _window:&Window, handler:fn())->Result<()>{
+    pub fn present(&self, _window: &Window, handler: fn()) -> Result<()> {
         handler();
         Ok(())
     }
@@ -2300,8 +2300,12 @@ impl GPUDevice {
         unimplemented!("pop_error_scope")
     }
 
-    pub fn write_buffer<T>(&self, buffer: &GPUBuffer, offset: usize, data: &Vec<T>) -> Result<()> {
-        self.handle.api.write_buffer(buffer.memory, offset, data)
+    pub fn write_buffer<T>(&self, _buffer: &GPUBuffer, offset: usize, data: &Vec<T>) -> Result<()> {
+        self.handle.api.write_buffer(
+            self.data.borrow().context.uniform_buffers[self.handle.swap_index].1,
+            offset,
+            data,
+        )
     }
 }
 
@@ -2746,10 +2750,13 @@ impl GPURenderPassEncoder {
         base_vertex: Option<GPUSignedOffset32>,
         first_instance: Option<GPUSize32>,
     ) -> Result<()> {
-        Logger::info(format!(
-            "GPUDevice::draw_indexed \t\t\tbuffer: 0x{:x}",
-            self.data.borrow().context.command_buffers[self.device.swap_index].as_raw(),
-        ).as_str());
+        Logger::info(
+            format!(
+                "GPUDevice::draw_indexed \t\t\tbuffer: 0x{:x}",
+                self.data.borrow().context.command_buffers[self.device.swap_index].as_raw(),
+            )
+            .as_str(),
+        );
         self.device.api.draw_indexed(
             self.data.borrow().context.command_buffers[self.device.swap_index],
             index_count,

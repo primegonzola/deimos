@@ -2,6 +2,7 @@
 
 #![allow(dead_code)]
 
+use cgmath::SquareMatrix;
 use vulkanalia::prelude::v1_0::*;
 
 pub type BufferSource = [u8];
@@ -685,4 +686,14 @@ pub struct GPUCameraUniform {
     pub model: cgmath::Matrix4<f32>,
     pub view: cgmath::Matrix4<f32>,
     pub projection: cgmath::Matrix4<f32>,
+}
+
+impl Default for GPUCameraUniform {
+    fn default() -> Self {
+        GPUCameraUniform {
+            model: cgmath::Matrix4::identity(),
+            view: cgmath::Matrix4::identity(),
+            projection: cgmath::Matrix4::identity(),
+        }
+    }
 }

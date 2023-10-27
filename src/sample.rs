@@ -11,10 +11,7 @@ use winit::window::Window;
 
 // use vulkanalia::prelude::v1_0::*;
 
-use crate::{
-    gpu::{self},
-    vulkan::CameraUniform,
-};
+use crate::gpu::{self};
 
 pub struct Sample {
     graphics: gpu::GPUDevice,
@@ -51,9 +48,9 @@ impl Sample {
             })?;
 
         // create camera uniform
-        let camera_uniform_buffer = graphics.create_typed_buffer::<CameraUniform>(
+        let camera_uniform_buffer = graphics.create_typed_buffer::<gpu::GPUCameraUniform>(
             gpu::GPUBufferUsageFlags::UNIFORM,
-            &vec![CameraUniform::default()],
+            &vec![gpu::GPUCameraUniform::default()],
         )?;
 
         // load mesh
@@ -425,9 +422,7 @@ impl Sample {
         Ok(())
     }
 
-    pub fn test(){
-
-    }
+    pub fn test() {}
 
     pub fn destroy(&mut self) {
         // destroy data
